@@ -24,7 +24,9 @@ yargs(hideBin(process.argv))
         type: "string",
       });
     }, //arguments
-    addRepo, //controller
+    (argv) => {
+      addRepo(argv.file);
+    }, //controller
   )
   .command(
     "commit <message>", //command name
@@ -35,7 +37,9 @@ yargs(hideBin(process.argv))
         type: "string",
       });
     }, //arguments
-    commitRepo, //controller
+    (argv) => {
+      commitRepo(argv.message);
+    }, //controller
   )
   .command(
     "push", //command name
