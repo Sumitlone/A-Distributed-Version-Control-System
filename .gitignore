@@ -1,1 +1,4 @@
 backend/.env
+backend/node_modules
+backend/.initFold
+frontend/node_modules
