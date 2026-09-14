@@ -1,172 +1,188 @@
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
-const { MongoClient, ReturnDocument } = require("mongodb");
+const User = require("../models/userModel");
 const dotenv = require("dotenv");
-var ObjectId = require("mongodb").ObjectId;
+
+// const { MongoClient, ReturnDocument } = require("mongodb");
+// var ObjectId = require("mongodb").ObjectId;
 
 dotenv.config();
-const uri = process.env.MONGODB_URI;
 
-let client;
+// const uri = process.env.MONGODB_URI;
 
-async function connectClient() {
-  if (!client) {
-    client = new MongoClient(uri);
-    await client.connect();
-  }
-}
+// let client;
 
+// async function connectClient() {
+//   if (!client) {
+//     client = new MongoClient(uri);
+//     await client.connect();
+//   }
+// }
+// Signup
 async function signup(req, res) {
   const { username, password, email } = req.body;
-  try {
-    await connectClient();
-    const db = client.db("VSC");
-    const usersCollection = db.collection("users");
 
-    const user = await usersCollection.findOne({ username });
+  try {
+    const user = await User.findOne({ username });
+
     if (user) {
-      return res.status(400).json({ message: "User already exists!" });
+      return res.status(400).json({
+        message: "User already exists!",
+      });
     }
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    const newUser = {
+    const newUser = await User.create({
       username,
       password: hashedPassword,
       email,
       repositories: [],
       followedUsers: [],
       starRepos: [],
-    };
+    });
 
-    const result = await usersCollection.insertOne(newUser);
+    const token = jwt.sign({ id: newUser._id }, process.env.JWT_SECRET_KEY, {
+      expiresIn: "168h",
+    });
 
-    const token = jwt.sign(
-      { id: result.insertId },
-      process.env.JWT_SECRET_KEY,
-      { expiresIn: "168h" },
-    );
-    res.json({ token, userId: result.insertId });
+    res.json({
+      token,
+      userId: newUser._id,
+    });
   } catch (error) {
-    console.error("Error during signup: ", error.message);
+    console.error("Error during signup:", error.message);
     res.status(500).send("Server error");
   }
 }
 
+// Login
 async function login(req, res) {
   const { email, password } = req.body;
-  try {
-    await connectClient();
-    const db = client.db("VSC");
-    const usersCollection = db.collection("users");
 
-    const user = await usersCollection.findOne({ email });
+  try {
+    const user = await User.findOne({ email });
+
     if (!user) {
-      return res.status(400).json({ message: "Invalid credentials!" });
+      return res.status(400).json({
+        message: "Invalid credentials!",
+      });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
+
     if (!isMatch) {
-      return res.status(400).json({ message: "Invalid credentials!" });
+      return res.status(400).json({
+        message: "Invalid credentials!",
+      });
     }
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET_KEY, {
       expiresIn: "168h",
     });
-    res.json({ token, userId: user._id });
+
+    res.json({
+      token,
+      userId: user._id,
+    });
   } catch (error) {
-    console.error("Error during login : ", error.message);
+    console.error("Error during login:", error.message);
     res.status(500).send("Server error!");
   }
 }
 
+// Get all users
 async function getAllUsers(req, res) {
   try {
-    await connectClient();
-    const db = client.db("VSC");
-    const usersCollection = db.collection("users");
+    const users = await User.find({});
 
-    const users = await usersCollection.find({}).toArray();
     res.json(users);
   } catch (error) {
-    console.error("Error during fetching : ", error.message);
+    console.error("Error during fetching:", error.message);
     res.status(500).send("Server error!");
   }
 }
 
-//CRUD of User
+// Get user profile
 async function getUserProfile(req, res) {
   const currentID = req.params.id;
-  try {
-    await connectClient();
-    const db = client.db("VSC");
-    const usersCollection = db.collection("users");
 
-    const user = await usersCollection.findOne({
-      _id: new ObjectId(currentID),
-    });
+  try {
+    const user = await User.findById(currentID);
 
     if (!user) {
-      return res.status(404).json({ message: "User not found!" });
+      return res.status(404).json({
+        message: "User not found!",
+      });
     }
-    res.send(user);
+
+    res.json(user);
   } catch (error) {
-    console.error("Error during fetching : ", error.message);
+    console.error("Error during fetching:", error.message);
     res.status(500).send("Server error!");
   }
 }
+
+// Update user profile
 async function updateUserProfile(req, res) {
   const currentID = req.params.id;
   const { email, password } = req.body;
 
   try {
-    await connectClient();
-    const db = client.db("VSC");
-    const usersCollection = db.collection("users");
+    const updateFields = {};
 
-    let updateFields = { email };
+    if (email) {
+      updateFields.email = email;
+    }
+
     if (password) {
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(password, salt);
+
       updateFields.password = hashedPassword;
     }
 
-    const result = await usersCollection.findOneAndUpdate(
-      {
-        _id: new ObjectId(currentID),
-      },
+    const user = await User.findByIdAndUpdate(
+      currentID,
       { $set: updateFields },
-      { returnDocument: "after" },
+      {
+        new: true,
+        runValidators: true,
+      },
     );
-    if (!result) {
-      return res.status(404).json({ message: "User not found!" });
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found!",
+      });
     }
 
-    res.send(result);
+    res.json(user);
   } catch (error) {
-    console.error("Error during fetching : ", error.message);
+    console.error("Error during updating:", error.message);
     res.status(500).send("Server error!");
   }
 }
+
+// Delete user profile
 async function deleteUserProfile(req, res) {
   const currentID = req.params.id;
+
   try {
-    await connectClient();
-    const db = client.db("VSC");
-    const usersCollection = db.collection("users");
+    const user = await User.findByIdAndDelete(currentID);
 
-    const result = await usersCollection.deleteOne({
-      _id: new ObjectId(currentID),
-    });
-
-    if (result.deleteCount == 0) {
-      return res.status(404).json({ message: "User not found" });
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+      });
     }
 
-    res.json({ message: "User Profile Deleted!" });
+    res.json({
+      message: "User Profile Deleted!",
+    });
   } catch (error) {
-    console.error("Error during fetching : ", error.message);
+    console.error("Error during deleting:", error.message);
     res.status(500).send("Server error!");
   }
 }
