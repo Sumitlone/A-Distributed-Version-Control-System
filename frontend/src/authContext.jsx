@@ -14,10 +14,11 @@ export const AuthProvider = ({ children }) => {
       setCurrentUser(userId);
     }
   }, []);
+
+  const value = {
+    currentUser,
+    setCurrentUser,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
-
-const value = {
-    currentUser, setCurrentUser
-}
-
-return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
