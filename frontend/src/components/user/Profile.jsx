@@ -4,73 +4,139 @@ import axios from "axios";
 import "./profile.css";
 import Navbar from "../Navbar";
 import { UnderlineNav } from "@primer/react";
-import { BookIcon, RepoIcon } from "@primer/octicons-react";
+import {
+  BookIcon,
+  RepoIcon,
+} from "@primer/octicons-react";
 import HeatMapProfile from "./HeatMap";
 import { useAuth } from "../../authContext";
 
+const API_URL = "http://localhost:3002";
+
 const Profile = () => {
   const navigate = useNavigate();
-  const [userDetails, setUserDetails] = useState({ username: "username" });
-  const [starredRepositories, setStarredRepositories] = useState([]);
-
-  const [activeTab, setActiveTab] = useState("overview");
   const { setCurrentUser } = useAuth();
 
-  useEffect(() => {
-    const fetchUserDetails = async () => {
-      const userId = localStorage.getItem("userId");
+  const [userDetails, setUserDetails] =
+    useState({ username: "username" });
 
-      if (userId) {
-        try {
-          const response = await axios.get(
-            `http://localhost:3002/userProfile/${userId}`,
-          );
-          setUserDetails(response.data);
-        } catch (err) {
-          console.error("Cannot fetch user details: ", err);
-        }
-      }
-    };
-    fetchUserDetails();
-  }, []);
+  const [userRepositories, setUserRepositories] =
+    useState([]);
+
+  const [starredRepositories, setStarredRepositories] =
+    useState([]);
+
+  const [activeTab, setActiveTab] =
+    useState("overview");
+
+  const [loadingRepositories, setLoadingRepositories] =
+    useState(true);
 
   useEffect(() => {
     const fetchProfileData = async () => {
-      const userId = localStorage.getItem("userId");
+      const userId =
+        localStorage.getItem("userId");
 
-      if (!userId) return;
+      if (!userId) {
+        navigate("/auth");
+        return;
+      }
 
       try {
-        const [profileResponse, starredResponse] = await Promise.all([
-          axios.get(`http://localhost:3002/userProfile/${userId}`),
+        const [
+          profileResponse,
+          starredResponse,
+          repositoriesResponse,
+        ] = await Promise.all([
+          axios.get(
+            `${API_URL}/userProfile/${userId}`,
+          ),
 
-          axios.get(`http://localhost:3002/userProfile/${userId}/starred`),
+          axios.get(
+            `${API_URL}/userProfile/${userId}/starred`,
+          ),
+
+          axios
+            .get(
+              `${API_URL}/repo/user/${userId}`,
+            )
+            .catch((err) => {
+              if (
+                err.response?.status === 404
+              ) {
+                return {
+                  data: {
+                    repositories: [],
+                  },
+                };
+              }
+
+              throw err;
+            }),
         ]);
 
-        setUserDetails(profileResponse.data);
+        setUserDetails(
+          profileResponse.data,
+        );
 
-        setStarredRepositories(starredResponse.data.starredRepositories || []);
+        setStarredRepositories(
+          starredResponse.data
+            .starredRepositories || [],
+        );
+
+        setUserRepositories(
+          repositoriesResponse.data
+            .repositories || [],
+        );
       } catch (err) {
-        console.error("Cannot fetch profile data: ", err);
+        console.error(
+          "Cannot fetch profile data:",
+          err,
+        );
+      } finally {
+        setLoadingRepositories(
+          false,
+        );
       }
     };
 
     fetchProfileData();
-  }, []);
+  }, [navigate]);
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("userId");
+
+    setCurrentUser(null);
+
+    navigate("/auth");
+  };
 
   return (
     <>
       <Navbar />
-      <UnderlineNav aria-label="Repository">
+
+      <UnderlineNav
+        aria-label="Profile navigation"
+        className="profile-tabs"
+      >
         <UnderlineNav.Item
-          aria-current={activeTab === "overview" ? "page" : undefined}
+          aria-current={
+            activeTab === "overview"
+              ? "page"
+              : undefined
+          }
           icon={BookIcon}
-          onClick={() => setActiveTab("overview")}
+          onClick={() =>
+            setActiveTab("overview")
+          }
           sx={{
-            backgroundColor: "transparent",
+            backgroundColor:
+              "transparent",
             color: "white",
             "&:hover": {
-              textDecoration: "underline",
+              textDecoration:
+                "underline",
               color: "white",
             },
           }}
@@ -79,14 +145,22 @@ const Profile = () => {
         </UnderlineNav.Item>
 
         <UnderlineNav.Item
-          aria-current={activeTab === "starred" ? "page" : undefined}
-          onClick={() => setActiveTab("starred")}
+          aria-current={
+            activeTab === "starred"
+              ? "page"
+              : undefined
+          }
+          onClick={() =>
+            setActiveTab("starred")
+          }
           icon={RepoIcon}
           sx={{
-            backgroundColor: "transparent",
+            backgroundColor:
+              "transparent",
             color: "whitesmoke",
             "&:hover": {
-              textDecoration: "underline",
+              textDecoration:
+                "underline",
               color: "white",
             },
           }}
@@ -95,81 +169,263 @@ const Profile = () => {
         </UnderlineNav.Item>
       </UnderlineNav>
 
-      <button
-        onClick={() => {
-          localStorage.removeItem("token");
-          localStorage.removeItem("userId");
-          setCurrentUser(null);
-
-          window.location.href = "/auth";
-        }}
-        style={{ position: "fixed", bottom: "50px", right: "50px" }}
-        id="logout"
-      >
-        Logout
-      </button>
-
       <div className="profile-page-wrapper">
-        <div className="user-profile-section">
-          <div className="profile-image"></div>
+
+        {/* Profile sidebar */}
+
+        <aside className="user-profile-section">
+
+          <div className="profile-image">
+            <span>
+              {userDetails.username
+                ?.charAt(0)
+                ?.toUpperCase() ||
+                "U"}
+            </span>
+          </div>
 
           <div className="name">
-            <h3>{userDetails.username}</h3>
+            <h3>
+              {userDetails.username}
+            </h3>
           </div>
 
-          <button className="follow-btn">Follow</button>
+          <button
+            className="follow-btn"
+            type="button"
+            disabled
+          >
+            Follow
+          </button>
 
           <div className="follower">
-            <p>10 Follower</p>
-            <p>3 Following</p>
+            <span>
+              10 Followers
+            </span>
+
+            <span>
+              3 Following
+            </span>
           </div>
-        </div>
 
-        <div className="profile-content-section">
+          <button
+            type="button"
+            onClick={handleLogout}
+            id="logout"
+            className="profile-logout-btn"
+          >
+            Logout
+          </button>
+        </aside>
+
+        {/* Main content */}
+
+        <main className="profile-content-section">
+
           {activeTab === "overview" ? (
-            <div className="heat-map-section">
-              <HeatMapProfile />
-            </div>
-          ) : (
-            <section className="starred-repo-section">
-              <div className="starred-repo-header">
-                <h2>Starred Repositories</h2>
+            <>
+              {/* User repositories */}
 
-                <span>{starredRepositories.length} repositories</span>
+              <section className="profile-repositories-section">
+
+                <div className="profile-section-heading">
+                  <div>
+                    <h2>
+                      Your Repositories
+                    </h2>
+
+                    <p>
+                      Repositories owned by
+                      your account.
+                    </p>
+                  </div>
+
+                  <Link
+                    to="/create"
+                    className="profile-create-btn"
+                  >
+                    New repository
+                  </Link>
+                </div>
+
+                {loadingRepositories ? (
+                  <p className="profile-message">
+                    Loading repositories...
+                  </p>
+                ) : userRepositories.length >
+                  0 ? (
+                  <div className="repo-card-wrapper profile-repo-grid">
+
+                    {userRepositories.map(
+                      (repo) => (
+                        <Link
+                          to={`/repo/${repo._id}`}
+                          className="repo repo-link"
+                          key={repo._id}
+                        >
+                          <div>
+                            <div className="profile-repo-title-row">
+
+                              <h3 className="repo-name">
+                                {repo.name}
+                              </h3>
+
+                              <span
+                                className={`profile-visibility-badge ${
+                                  repo.visibility
+                                    ? "public"
+                                    : "private"
+                                }`}
+                              >
+                                {repo.visibility
+                                  ? "Public"
+                                  : "Private"}
+                              </span>
+                            </div>
+
+                            {repo.description && (
+                              <p className="description">
+                                {repo.description}
+                              </p>
+                            )}
+                          </div>
+
+                          <p className="repo-owner">
+                            {userDetails.username ||
+                              "You"}
+                          </p>
+                        </Link>
+                      ),
+                    )}
+
+                  </div>
+                ) : (
+                  <div className="empty-repo-state">
+                    <p>
+                      You do not have any
+                      repositories yet.
+                    </p>
+
+                    <Link to="/create">
+                      Create your first
+                      repository
+                    </Link>
+                  </div>
+                )}
+              </section>
+
+              {/* Heatmap */}
+
+              <section className="heat-map-section">
+
+                <div className="profile-section-heading heatmap-heading">
+                  <div>
+                    <h2>
+                      Contribution Activity
+                    </h2>
+
+                    <p>
+                      Your current
+                      contribution activity.
+                    </p>
+                  </div>
+                </div>
+
+                <HeatMapProfile />
+
+              </section>
+            </>
+          ) : (
+
+            /* Starred repositories */
+
+            <section className="starred-repo-section">
+
+              <div className="profile-section-heading">
+
+                <div>
+                  <h2>
+                    Starred Repositories
+                  </h2>
+
+                  <p>
+                    Repositories you have starred.
+                  </p>
+                </div>
+
+                <span className="repo-count">
+                  {starredRepositories.length}{" "}
+                  repositories
+                </span>
+
               </div>
 
-              {starredRepositories.length > 0 ? (
-                <div className="repo-card-wrapper">
-                  {starredRepositories.map((repo) => (
-                    <Link
-                      to={`/repo/${repo._id}`}
-                      className="repo repo-link"
-                      key={repo._id}
-                    >
-                      <div>
-                        <h3 className="repo-name">{repo.name}</h3>
+              {starredRepositories.length >
+              0 ? (
+                <div className="repo-card-wrapper profile-repo-grid">
 
-                        {repo.description && (
-                          <p className="description">{repo.description}</p>
-                        )}
-                      </div>
+                  {starredRepositories.map(
+                    (repo) => (
+                      <Link
+                        to={`/repo/${repo._id}`}
+                        className="repo repo-link"
+                        key={repo._id}
+                      >
+                        <div>
 
-                      <p className="repo-owner">
-                        {repo.owner?.username || "Unknown owner"}
-                      </p>
-                    </Link>
-                  ))}
+                          <div className="profile-repo-title-row">
+
+                            <h3 className="repo-name">
+                              {repo.name}
+                            </h3>
+
+                            <span
+                              className={`profile-visibility-badge ${
+                                repo.visibility
+                                  ? "public"
+                                  : "private"
+                              }`}
+                            >
+                              {repo.visibility
+                                ? "Public"
+                                : "Private"}
+                            </span>
+
+                          </div>
+
+                          {repo.description && (
+                            <p className="description">
+                              {repo.description}
+                            </p>
+                          )}
+
+                        </div>
+
+                        <p className="repo-owner">
+                          {repo.owner?.username ||
+                            "Unknown owner"}
+                        </p>
+                      </Link>
+                    ),
+                  )}
+
                 </div>
               ) : (
                 <div className="empty-starred-state">
-                  <p>You have not starred any repositories yet.</p>
+                  <p>
+                    You have not starred any
+                    repositories yet.
+                  </p>
 
-                  <Link to="/">Browse repositories</Link>
+                  <Link to="/">
+                    Browse repositories
+                  </Link>
                 </div>
               )}
             </section>
           )}
-        </div>
+
+        </main>
       </div>
     </>
   );

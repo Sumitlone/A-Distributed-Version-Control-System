@@ -28,7 +28,8 @@ body,
 }
 
 .logo-login {
-  width: 48px;
+  width: 70px;
+  border-radius: 50%;
 }
 
 .login-box-wrapper {
