@@ -395,3 +395,94 @@
     width: 100%;
   }
 }
+
+.repo-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 15px;
+  margin-bottom: 16px;
+}
+
+.repo-card-heading h2 {
+  margin-bottom: 4px;
+}
+
+.repo-card-subtitle {
+  margin: 0;
+  color: #8b949e;
+  font-size: 12px;
+}
+
+.view-issues-btn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 11px;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  background: #21262d;
+  color: #f0f6fc;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.view-issues-btn:hover {
+  background: #30363d;
+  color: #ffffff;
+}
+
+.issue-preview-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  text-decoration: none;
+}
+
+.issue-preview-item:hover {
+  border-color: #58a6ff;
+}
+
+.issue-preview-item > div {
+  min-width: 0;
+}
+
+.issue-preview-status {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border: 1px solid;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.issue-preview-status.open {
+  color: #3fb950;
+  border-color: rgba(63, 185, 80, 0.45);
+}
+
+.issue-preview-status.closed {
+  color: #a371f7;
+  border-color: rgba(163, 113, 247, 0.45);
+}
+
+.create-first-issue-link,
+.view-more-issues {
+  display: inline-block;
+  margin-top: 10px;
+  color: #58a6ff;
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.create-first-issue-link:hover,
+.view-more-issues:hover {
+  text-decoration: underline;
+}
+
+.view-more-issues {
+  margin-top: 15px;
+}

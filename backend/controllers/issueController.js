@@ -1,6 +1,5 @@
 const mongoose = require("mongoose");
 const Repository = require("../models/repoModel");
-const User = require("../models/userModel");
 const Issue = require("../models/issueModel");
 
 async function createIssue(req, res) {
@@ -8,17 +7,58 @@ async function createIssue(req, res) {
   const { id } = req.params;
 
   try {
+    if (!title || !description) {
+      return res.status(400).json({
+        error: "Title and description are required!",
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        error: "Invalid repository ID!",
+      });
+    }
+
+    const repository = await Repository.findById(id);
+
+    if (!repository) {
+      return res.status(404).json({
+        error: "Repository not found!",
+      });
+    }
+
     const issue = new Issue({
-      title,
-      description,
+      title: title.trim(),
+      description: description.trim(),
       repository: id,
     });
 
     await issue.save();
 
-    res.status(201).json(issue);
+    repository.issues.push(issue._id);
+    await repository.save();
+
+    const populatedIssue = await Issue.findById(
+      issue._id,
+    ).populate({
+      path: "repository",
+      select: "name owner visibility",
+      populate: {
+        path: "owner",
+        select: "username",
+      },
+    });
+
+    res.status(201).json({
+      message: "Issue created successfully!",
+      issue: populatedIssue,
+    });
   } catch (error) {
-    console.error("Error during issue creation : ", error.message);
+    console.error(
+      "Error during issue creation:",
+      error.message,
+    );
+
     res.status(500).send("Server error");
   }
 }
@@ -26,22 +66,54 @@ async function createIssue(req, res) {
 async function upadteIssueById(req, res) {
   const { id } = req.params;
   const { title, description, status } = req.body;
+
   try {
     const issue = await Issue.findById(id);
 
     if (!issue) {
-      return res.status(404).json({ error: "Issue not found!" });
+      return res.status(404).json({
+        error: "Issue not found!",
+      });
     }
 
-    issue.title = title;
-    issue.description = description;
-    issue.status = status;
+    if (title !== undefined) {
+      issue.title = title.trim();
+    }
+
+    if (description !== undefined) {
+      issue.description = description.trim();
+    }
+
+    if (
+      status !== undefined &&
+      ["open", "closed"].includes(status)
+    ) {
+      issue.status = status;
+    }
 
     await issue.save();
 
-    res.json(issue, { message: "Issue updated" });
+    const updatedIssue = await Issue.findById(
+      issue._id,
+    ).populate({
+      path: "repository",
+      select: "name owner visibility",
+      populate: {
+        path: "owner",
+        select: "username",
+      },
+    });
+
+    res.json({
+      message: "Issue updated successfully!",
+      issue: updatedIssue,
+    });
   } catch (error) {
-    console.error("Error during issue updation : ", error.message);
+    console.error(
+      "Error during issue updation:",
+      error.message,
+    );
+
     res.status(500).send("Server error");
   }
 }
@@ -50,14 +122,34 @@ async function deleteIssueById(req, res) {
   const { id } = req.params;
 
   try {
-    const issue = Issue.findByIdAndDelete(id);
+    const issue = await Issue.findById(id);
 
     if (!issue) {
-      return res.status(404).json({ error: "Issue not found!" });
+      return res.status(404).json({
+        error: "Issue not found!",
+      });
     }
-    res.json({ message: "Issue deleted" });
+
+    await Repository.findByIdAndUpdate(
+      issue.repository,
+      {
+        $pull: {
+          issues: issue._id,
+        },
+      },
+    );
+
+    await Issue.findByIdAndDelete(id);
+
+    res.json({
+      message: "Issue deleted successfully!",
+    });
   } catch (error) {
-    console.error("Error during issue deletion : ", error.message);
+    console.error(
+      "Error during issue deletion:",
+      error.message,
+    );
+
     res.status(500).send("Server error");
   }
 }
@@ -66,30 +158,69 @@ async function getAllIssues(req, res) {
   const { id } = req.params;
 
   try {
-    const issues = Issue.find({ repository: id });
-
-    if (!issues) {
-      return res.status(404).json({ error: "Issues not found!" });
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        error: "Invalid repository ID!",
+      });
     }
+
+    const repository = await Repository.findById(id);
+
+    if (!repository) {
+      return res.status(404).json({
+        error: "Repository not found!",
+      });
+    }
+
+    const issues = await Issue.find({
+      repository: id,
+    }).sort({
+      createdAt: -1,
+    });
+
     res.status(200).json(issues);
   } catch (err) {
-    console.error("Error during issue fetching : ", err.message);
+    console.error(
+      "Error during issue fetching:",
+      err.message,
+    );
+
     res.status(500).send("Server error");
   }
 }
 
 async function getIssueById(req, res) {
   const { id } = req.params;
+
   try {
-    const issue = await Issue.findById(id);
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        error: "Invalid issue ID!",
+      });
+    }
+
+    const issue = await Issue.findById(id).populate({
+      path: "repository",
+      select: "name owner visibility",
+      populate: {
+        path: "owner",
+        select: "username",
+      },
+    });
 
     if (!issue) {
-      return res.status(404).json({ error: "Issue not found!" });
+      return res.status(404).json({
+        error: "Issue not found!",
+      });
     }
 
     res.json(issue);
   } catch (err) {
-    console.error("Error during issue updation : ", err.message);
+    console.error(
+      "Error during issue fetching:",
+      err.message,
+    );
+
     res.status(500).send("Server error");
   }
 }

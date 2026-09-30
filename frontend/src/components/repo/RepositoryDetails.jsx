@@ -34,20 +34,14 @@ const RepositoryDetails = () => {
         setLoading(true);
         setError("");
 
-        const response = await axios.get(
-          `${API_URL}/repo/${id}`,
-        );
+        const response = await axios.get(`${API_URL}/repo/${id}`);
 
-        const repo =
-          response.data.repository || response.data;
+        const repo = response.data.repository || response.data;
 
         setRepository(repo);
         setEditDescription(repo.description || "");
       } catch (err) {
-        console.error(
-          "Cannot fetch repository:",
-          err,
-        );
+        console.error("Cannot fetch repository:", err);
 
         setError(
           err.response?.data?.error ||
@@ -71,20 +65,13 @@ const RepositoryDetails = () => {
           `${API_URL}/userProfile/${userId}/starred`,
         );
 
-        const starredRepos =
-          response.data.starredRepositories || [];
+        const starredRepos = response.data.starredRepositories || [];
 
         setIsStarred(
-          starredRepos.some(
-            (repo) =>
-              String(repo._id) === String(id),
-          ),
+          starredRepos.some((repo) => String(repo._id) === String(id)),
         );
       } catch (err) {
-        console.error(
-          "Cannot fetch starred repositories:",
-          err,
-        );
+        console.error("Cannot fetch starred repositories:", err);
       }
     };
 
@@ -101,17 +88,11 @@ const RepositoryDetails = () => {
       : String(repository.owner);
   }, [repository]);
 
-  const isOwner = Boolean(
-    userId && ownerId === String(userId),
-  );
+  const isOwner = Boolean(userId && ownerId === String(userId));
 
-  const content = Array.isArray(repository?.content)
-    ? repository.content
-    : [];
+  const content = Array.isArray(repository?.content) ? repository.content : [];
 
-  const issues = Array.isArray(repository?.issues)
-    ? repository.issues
-    : [];
+  const issues = Array.isArray(repository?.issues) ? repository.issues : [];
 
   const handleStar = async () => {
     if (!userId || !id) return;
@@ -125,19 +106,14 @@ const RepositoryDetails = () => {
 
       setIsStarred(Boolean(response.data.starred));
     } catch (err) {
-      console.error(
-        "Cannot update starred repository:",
-        err,
-      );
+      console.error("Cannot update starred repository:", err);
     } finally {
       setStarLoading(false);
     }
   };
 
   const handleStartEdit = () => {
-    setEditDescription(
-      repository.description || "",
-    );
+    setEditDescription(repository.description || "");
 
     setNewContent("");
     setEditError("");
@@ -147,9 +123,7 @@ const RepositoryDetails = () => {
   const handleCancelEdit = () => {
     if (editLoading) return;
 
-    setEditDescription(
-      repository.description || "",
-    );
+    setEditDescription(repository.description || "");
 
     setNewContent("");
     setEditError("");
@@ -161,46 +135,33 @@ const RepositoryDetails = () => {
 
     if (!isOwner) return;
 
-    const description =
-      editDescription.trim();
+    const description = editDescription.trim();
 
-    const contentItem =
-      newContent.trim();
+    const contentItem = newContent.trim();
 
     try {
       setEditLoading(true);
       setEditError("");
 
-      const response = await axios.put(
-        `${API_URL}/repo/update/${id}`,
-        {
-          description,
-          ...(contentItem
-            ? { content: contentItem }
-            : {}),
-        },
-      );
+      const response = await axios.put(`${API_URL}/repo/update/${id}`, {
+        description,
+        ...(contentItem ? { content: contentItem } : {}),
+      });
 
       const updatedRepository =
-        response.data.repository ||
-        response.data.updatedRepository;
+        response.data.repository || response.data.updatedRepository;
 
       if (updatedRepository) {
         setRepository(updatedRepository);
 
-        setEditDescription(
-          updatedRepository.description || "",
-        );
+        setEditDescription(updatedRepository.description || "");
       } else {
         setRepository((current) => ({
           ...current,
           description,
           ...(contentItem
             ? {
-                content: [
-                  ...(current.content || []),
-                  contentItem,
-                ],
+                content: [...(current.content || []), contentItem],
               }
             : {}),
         }));
@@ -209,10 +170,7 @@ const RepositoryDetails = () => {
       setNewContent("");
       setIsEditing(false);
     } catch (err) {
-      console.error(
-        "Cannot update repository:",
-        err,
-      );
+      console.error("Cannot update repository:", err);
 
       setEditError(
         err.response?.data?.error ||
@@ -230,12 +188,9 @@ const RepositoryDetails = () => {
     try {
       setVisibilityLoading(true);
 
-      const response = await axios.patch(
-        `${API_URL}/repo/toggle/${id}`,
-      );
+      const response = await axios.patch(`${API_URL}/repo/toggle/${id}`);
 
-      const updatedRepository =
-        response.data.repository;
+      const updatedRepository = response.data.repository;
 
       if (updatedRepository) {
         setRepository(updatedRepository);
@@ -246,10 +201,7 @@ const RepositoryDetails = () => {
         }));
       }
     } catch (err) {
-      console.error(
-        "Cannot toggle repository visibility:",
-        err,
-      );
+      console.error("Cannot toggle repository visibility:", err);
 
       setError(
         err.response?.data?.error ||
@@ -274,16 +226,11 @@ const RepositoryDetails = () => {
       setDeleteLoading(true);
       setError("");
 
-      await axios.delete(
-        `${API_URL}/repo/delete/${id}`,
-      );
+      await axios.delete(`${API_URL}/repo/delete/${id}`);
 
       navigate("/");
     } catch (err) {
-      console.error(
-        "Cannot delete repository:",
-        err,
-      );
+      console.error("Cannot delete repository:", err);
 
       setError(
         err.response?.data?.error ||
@@ -301,9 +248,7 @@ const RepositoryDetails = () => {
         <Navbar />
 
         <div className="repo-details-page">
-          <p className="repo-details-message">
-            Loading repository...
-          </p>
+          <p className="repo-details-message">Loading repository...</p>
         </div>
       </>
     );
@@ -316,14 +261,10 @@ const RepositoryDetails = () => {
 
         <div className="repo-details-page">
           <p className="repo-details-message">
-            {error ||
-              "Repository not found."}
+            {error || "Repository not found."}
           </p>
 
-          <button
-            className="back-btn"
-            onClick={() => navigate(-1)}
-          >
+          <button className="back-btn" onClick={() => navigate(-1)}>
             Go Back
           </button>
         </div>
@@ -336,48 +277,33 @@ const RepositoryDetails = () => {
       <Navbar />
 
       <main className="repo-details-page">
-
         {/* Header */}
 
         <div className="repo-details-header">
           <div className="repo-header-main">
-
             <div className="breadcrumb">
-              <Link to="/">
-                Repositories
-              </Link>
+              <Link to="/">Repositories</Link>
 
               <span>/</span>
 
-              <span>
-                {repository.name}
-              </span>
+              <span>{repository.name}</span>
             </div>
 
             <div className="repo-title-row">
-              <h1>
-                {repository.name}
-              </h1>
+              <h1>{repository.name}</h1>
 
               <span
                 className={`visibility-badge ${
-                  repository.visibility
-                    ? "public"
-                    : "private"
+                  repository.visibility ? "public" : "private"
                 }`}
               >
-                {repository.visibility
-                  ? "Public"
-                  : "Private"}
+                {repository.visibility ? "Public" : "Private"}
               </span>
             </div>
 
             <p className="repo-owner">
               Owned by{" "}
-              <strong>
-                {repository.owner?.username ||
-                  "Unknown user"}
-              </strong>
+              <strong>{repository.owner?.username || "Unknown user"}</strong>
             </p>
 
             {repository.description && (
@@ -390,33 +316,21 @@ const RepositoryDetails = () => {
           {/* Star */}
 
           <button
-            className={`star-btn ${
-              isStarred ? "starred" : ""
-            }`}
+            className={`star-btn ${isStarred ? "starred" : ""}`}
             onClick={handleStar}
             disabled={starLoading}
           >
-            {starLoading
-              ? "Saving..."
-              : isStarred
-                ? "★ Starred"
-                : "☆ Star"}
+            {starLoading ? "Saving..." : isStarred ? "★ Starred" : "☆ Star"}
           </button>
         </div>
 
-        {error && (
-          <p className="repo-inline-error">
-            {error}
-          </p>
-        )}
+        {error && <p className="repo-inline-error">{error}</p>}
 
         {/* Management */}
 
         <section className="repo-management-bar">
           <div className="management-summary">
-            <strong>
-              Repository management
-            </strong>
+            <strong>Repository management</strong>
 
             <span>
               {isOwner
@@ -427,16 +341,11 @@ const RepositoryDetails = () => {
 
           {isOwner && (
             <div className="management-actions">
-
               <button
                 type="button"
                 className="management-btn"
                 onClick={handleStartEdit}
-                disabled={
-                  editLoading ||
-                  deleteLoading ||
-                  visibilityLoading
-                }
+                disabled={editLoading || deleteLoading || visibilityLoading}
               >
                 Edit
               </button>
@@ -445,11 +354,7 @@ const RepositoryDetails = () => {
                 type="button"
                 className="management-btn"
                 onClick={handleToggleVisibility}
-                disabled={
-                  visibilityLoading ||
-                  editLoading ||
-                  deleteLoading
-                }
+                disabled={visibilityLoading || editLoading || deleteLoading}
               >
                 {visibilityLoading
                   ? "Updating..."
@@ -462,17 +367,10 @@ const RepositoryDetails = () => {
                 type="button"
                 className="management-btn danger"
                 onClick={handleDeleteRepository}
-                disabled={
-                  deleteLoading ||
-                  editLoading ||
-                  visibilityLoading
-                }
+                disabled={deleteLoading || editLoading || visibilityLoading}
               >
-                {deleteLoading
-                  ? "Deleting..."
-                  : "Delete"}
+                {deleteLoading ? "Deleting..." : "Delete"}
               </button>
-
             </div>
           )}
         </section>
@@ -481,7 +379,6 @@ const RepositoryDetails = () => {
 
         {isEditing && isOwner && (
           <section className="repo-edit-card">
-
             <div className="repo-edit-heading">
               <h2>Edit Repository</h2>
 
@@ -496,22 +393,14 @@ const RepositoryDetails = () => {
               </button>
             </div>
 
-            <form
-              onSubmit={handleSaveEdit}
-            >
+            <form onSubmit={handleSaveEdit}>
               <div className="edit-form-group">
-                <label htmlFor="edit-description">
-                  Description
-                </label>
+                <label htmlFor="edit-description">Description</label>
 
                 <textarea
                   id="edit-description"
                   value={editDescription}
-                  onChange={(event) =>
-                    setEditDescription(
-                      event.target.value,
-                    )
-                  }
+                  onChange={(event) => setEditDescription(event.target.value)}
                   rows={4}
                   maxLength={500}
                   placeholder="Describe your repository"
@@ -519,37 +408,25 @@ const RepositoryDetails = () => {
               </div>
 
               <div className="edit-form-group">
-                <label htmlFor="new-content">
-                  Add content item
-                </label>
+                <label htmlFor="new-content">Add content item</label>
 
                 <textarea
                   id="new-content"
                   value={newContent}
-                  onChange={(event) =>
-                    setNewContent(
-                      event.target.value,
-                    )
-                  }
+                  onChange={(event) => setNewContent(event.target.value)}
                   rows={3}
                   placeholder="Optional: add a file name or content entry"
                 />
 
                 <small>
-                  This follows your current backend
-                  model, where repository content is
-                  stored as an array of strings.
+                  This follows your current backend model, where repository
+                  content is stored as an array of strings.
                 </small>
               </div>
 
-              {editError && (
-                <p className="repo-inline-error">
-                  {editError}
-                </p>
-              )}
+              {editError && <p className="repo-inline-error">{editError}</p>}
 
               <div className="edit-actions">
-
                 <button
                   type="button"
                   className="management-btn"
@@ -564,11 +441,8 @@ const RepositoryDetails = () => {
                   className="save-edit-btn"
                   disabled={editLoading}
                 >
-                  {editLoading
-                    ? "Saving..."
-                    : "Save changes"}
+                  {editLoading ? "Saving..." : "Save changes"}
                 </button>
-
               </div>
             </form>
           </section>
@@ -577,116 +451,114 @@ const RepositoryDetails = () => {
         {/* Repository information */}
 
         <section className="repo-details-grid">
-
           <div className="repo-details-card">
-            <h2>
-              Repository Information
-            </h2>
+            <h2>Repository Information</h2>
 
             <div className="repo-stat-row">
-              <span>
-                Visibility
-              </span>
+              <span>Visibility</span>
 
-              <strong>
-                {repository.visibility
-                  ? "Public"
-                  : "Private"}
-              </strong>
+              <strong>{repository.visibility ? "Public" : "Private"}</strong>
             </div>
 
             <div className="repo-stat-row">
-              <span>
-                Files / Content
-              </span>
+              <span>Files / Content</span>
 
-              <strong>
-                {content.length}
-              </strong>
+              <strong>{content.length}</strong>
             </div>
 
             <div className="repo-stat-row">
-              <span>
-                Issues
-              </span>
+              <span>Issues</span>
 
-              <strong>
-                {issues.length}
-              </strong>
+              <strong>{issues.length}</strong>
             </div>
 
             <div className="repo-stat-row">
-              <span>
-                Created
-              </span>
+              <span>Created</span>
 
               <strong>
                 {repository.createdAt
-                  ? new Date(
-                      repository.createdAt,
-                    ).toLocaleDateString()
+                  ? new Date(repository.createdAt).toLocaleDateString()
                   : "-"}
               </strong>
             </div>
           </div>
-
           {/* Content */}
-
           <div className="repo-details-card">
             <h2>Content</h2>
 
             {content.length > 0 ? (
               <div className="content-list">
-                {content.map(
-                  (item, index) => (
-                    <div
-                      className="content-item"
-                      key={`${item}-${index}`}
-                    >
-                      {item}
-                    </div>
-                  ),
-                )}
-              </div>
-            ) : (
-              <p className="empty-state">
-                No content has been added yet.
-              </p>
-            )}
-          </div>
-
-          {/* Issues */}
-
-          <div className="repo-details-card">
-            <h2>Issues</h2>
-
-            {issues.length > 0 ? (
-              <div className="content-list">
-                {issues.map((issue) => (
-                  <div
-                    className="content-item"
-                    key={issue._id}
-                  >
-                    <strong>
-                      {issue.title ||
-                        "Untitled issue"}
-                    </strong>
-
-                    {issue.description && (
-                      <span>
-                        {issue.description}
-                      </span>
-                    )}
+                {content.map((item, index) => (
+                  <div className="content-item" key={`${item}-${index}`}>
+                    {item}
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="empty-state">
-                No issues in this repository.
-              </p>
+              <p className="empty-state">No content has been added yet.</p>
             )}
           </div>
+          
+          {/* Issues */}
+          <div className="repo-details-card">
+            <div className="repo-card-heading">
+              <div>
+                <h2>Issues</h2>
 
+                <p className="repo-card-subtitle">
+                  {issues.length} issue
+                  {issues.length !== 1 ? "s" : ""} in this repository.
+                </p>
+              </div>
+
+              <Link to={`/repo/${id}/issues`} className="view-issues-btn">
+                View all
+              </Link>
+            </div>
+
+            {issues.length > 0 ? (
+              <div className="content-list">
+                {issues.slice(0, 5).map((issue) => (
+                  <Link
+                    to={`/repo/${id}/issues/${issue._id}`}
+                    className="content-item issue-preview-item"
+                    key={issue._id}
+                  >
+                    <div>
+                      <strong>{issue.title || "Untitled issue"}</strong>
+
+                      {issue.description && <span>{issue.description}</span>}
+                    </div>
+
+                    <span
+                      className={`issue-preview-status ${
+                        issue.status === "open" ? "open" : "closed"
+                      }`}
+                    >
+                      {issue.status === "open" ? "Open" : "Closed"}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-state">
+                <p>No issues in this repository.</p>
+
+                <Link
+                  to={`/repo/${id}/issues/new`}
+                  className="create-first-issue-link"
+                >
+                  Create the first issue
+                </Link>
+              </div>
+            )}
+
+            {issues.length > 5 && (
+              <Link to={`/repo/${id}/issues`} className="view-more-issues">
+                View all {issues.length} issues →
+              </Link>
+            )}
+          </div>{" "}
         </section>
       </main>
     </>
