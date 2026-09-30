@@ -39,7 +39,7 @@ async function createRepository(req, res) {
 async function getAllRepositories(req, res) {
   try {
     const repositories = await Repository.find({})
-      .populate("owner")
+      .populate("owner", "username")
       .populate("issues");
 
     res.json(repositories);
@@ -52,11 +52,25 @@ async function getAllRepositories(req, res) {
 async function fetchRepositoryById(req, res) {
   const { id } = req.params;
   try {
-    const repository = await Repository.find({ _id: id })
-      .populate("owner")
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        error: "Invalid Repository ID!",
+      });
+    }
+
+    const repository = await Repository.findById(id)
+      .populate("owner", "username")
       .populate("issues");
 
-    res.json(repository);
+    if (!repository) {
+      return res.status(404).json({
+        error: "Repository not found!",
+      });
+    }
+
+    res.json({
+      repository,
+    });
   } catch (error) {
     console.error("Error during fetching repository : ", error.message);
     res.status(500).send("Server error");

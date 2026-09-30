@@ -2,6 +2,8 @@ const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const User = require("../models/userModel");
 const dotenv = require("dotenv");
+const Repository = require("../models/repoModel");
+const mongoose = require("mongoose");
 
 // const { MongoClient, ReturnDocument } = require("mongodb");
 // var ObjectId = require("mongodb").ObjectId;
@@ -165,6 +167,92 @@ async function updateUserProfile(req, res) {
   }
 }
 
+// Get starred repositories for a user
+async function getStarredRepositories(req, res) {
+  const { id } = req.params;
+
+  try {
+    const user = await User.findById(id).populate({
+      path: "starRepos",
+      populate: {
+        path: "owner",
+        select: "username",
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found!",
+      });
+    }
+
+    res.json({
+      starredRepositories: user.starRepos || [],
+    });
+  } catch (error) {
+    console.error("Error during fetching starred repositories:", error.message);
+
+    res.status(500).send("Server error!");
+  }
+}
+
+// Star / unstar a repository
+async function toggleStarRepository(req, res) {
+  const { userId, repoId } = req.params;
+
+  try {
+    if (
+      !mongoose.Types.ObjectId.isValid(userId) ||
+      !mongoose.Types.ObjectId.isValid(repoId)
+    ) {
+      return res.status(400).json({
+        message: "Invalid user or repository ID!",
+      });
+    }
+
+    const [user, repository] = await Promise.all([
+      User.findById(userId),
+      Repository.findById(repoId),
+    ]);
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found!",
+      });
+    }
+
+    if (!repository) {
+      return res.status(404).json({
+        message: "Repository not found!",
+      });
+    }
+
+    const alreadyStarred = user.starRepos.some(
+      (repo) => repo.toString() === repoId,
+    );
+
+    if (alreadyStarred) {
+      user.starRepos.pull(repoId);
+    } else {
+      user.starRepos.addToSet(repoId);
+    }
+
+    await user.save();
+
+    res.json({
+      message: alreadyStarred
+        ? "Repository unstarred successfully!"
+        : "Repository starred successfully!",
+
+      starred: !alreadyStarred,
+    });
+  } catch (error) {
+    console.error("Error during starring repository:", error.message);
+
+    res.status(500).send("Server error!");
+  }
+}
+
 // Delete user profile
 async function deleteUserProfile(req, res) {
   const currentID = req.params.id;
@@ -194,4 +282,6 @@ module.exports = {
   getUserProfile,
   updateUserProfile,
   deleteUserProfile,
+  getStarredRepositories,
+  toggleStarRepository,
 };

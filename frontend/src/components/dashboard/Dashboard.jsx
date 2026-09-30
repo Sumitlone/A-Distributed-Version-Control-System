@@ -1,13 +1,19 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { Link, useNavigate } from "react-router-dom";
 import "./dashboard.css";
 import Navbar from "../Navbar";
 
 const Dashboard = () => {
+  const navigate = useNavigate();
+
   const [repositories, setRepositories] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [suggestedRepositories, setSuggestedRepositories] = useState([]);
   const [searchResults, setSearchResults] = useState([]);
+
+  const [starredRepoIds, setStarredRepoIds] = useState([]);
+  const [starLoadingId, setStarLoadingId] = useState(null);
 
   useEffect(() => {
     const userId = localStorage.getItem("userId");
@@ -15,7 +21,7 @@ const Dashboard = () => {
     const fetchRepositories = async () => {
       try {
         const response = await axios.get(
-          `http://localhost:3002/repo/user/${userId}`
+          `http://localhost:3002/repo/user/${userId}`,
         );
 
         setRepositories(response.data.repositories);
@@ -34,8 +40,25 @@ const Dashboard = () => {
       }
     };
 
+    const fetchStarredRepositories = async () => {
+      if (!userId) return;
+
+      try {
+        const response = await axios.get(
+          `http://localhost:3002/userProfile/${userId}/starred`,
+        );
+
+        const starredRepositories = response.data.starredRepositories || [];
+
+        setStarredRepoIds(starredRepositories.map((repo) => String(repo._id)));
+      } catch (err) {
+        console.error("Error while fetching starred repositories:", err);
+      }
+    };
+
     fetchRepositories();
     fetchSuggestedRepositories();
+    fetchStarredRepositories();
   }, []);
 
   useEffect(() => {
@@ -43,7 +66,7 @@ const Dashboard = () => {
       setSearchResults(repositories);
     } else {
       const filteredRepo = repositories.filter((repo) =>
-        repo.name.toLowerCase().includes(searchQuery.toLowerCase())
+        repo.name.toLowerCase().includes(searchQuery.toLowerCase()),
       );
 
       setSearchResults(filteredRepo);
@@ -60,12 +83,99 @@ const Dashboard = () => {
           <h3>Suggested Repositories</h3>
 
           <div className="repo-list">
-            {suggestedRepositories.map((repo) => (
-              <div className="repo-card" key={repo._id}>
-                <h4>{repo.name}</h4>
-                {repo.description && <p>{repo.description}</p>}
-              </div>
-            ))}
+            {suggestedRepositories.map((repo) => {
+              const repoId = String(repo._id);
+
+              const isStarred =
+                starredRepoIds.includes(repoId);
+
+              const handleStar = async (event) => {
+                /*
+                  Prevent the click from doing anything
+                  to the repository link.
+                */
+                event.preventDefault();
+                event.stopPropagation();
+
+                const userId =
+                  localStorage.getItem("userId");
+
+                if (
+                  !userId ||
+                  starLoadingId === repoId
+                ) {
+                  return;
+                }
+
+                try {
+                  setStarLoadingId(repoId);
+
+                  const response = await axios.patch(
+                    `http://localhost:3002/userProfile/${userId}/star/${repoId}`
+                  );
+
+                  setStarredRepoIds((current) => {
+                    if (response.data.starred) {
+                      return current.includes(repoId)
+                        ? current
+                        : [...current, repoId];
+                    }
+
+                    return current.filter(
+                      (id) => id !== repoId
+                    );
+                  });
+                } catch (err) {
+                  console.error(
+                    "Error while updating starred repository:",
+                    err
+                  );
+                } finally {
+                  setStarLoadingId(null);
+                }
+              };
+
+              return (
+                <div
+                  className="repo-card suggested-repo-card"
+                  key={repoId}
+                >
+                  {/* Repository */}
+                  <Link
+                    to={`/repo/${repoId}`}
+                    className="repo-card-link"
+                  >
+                    <h4>{repo.name}</h4>
+
+                    {repo.description && (
+                      <p>{repo.description}</p>
+                    )}
+                  </Link>
+
+                  {/* Star Button */}
+                  <button
+                    type="button"
+                    className={`repo-star-btn ${
+                      isStarred ? "starred" : ""
+                    }`}
+                    onClick={handleStar}
+                    disabled={starLoadingId === repoId}
+                    aria-label={
+                      isStarred
+                        ? `Unstar ${repo.name}`
+                        : `Star ${repo.name}`
+                    }
+                    title={
+                      isStarred
+                        ? "Unstar repository"
+                        : "Star repository"
+                    }
+                  >
+                    {isStarred ? "★" : "☆"}
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </aside>
 
@@ -86,10 +196,15 @@ const Dashboard = () => {
 
           <div className="repo-list">
             {searchResults.map((repo) => (
-              <div className="repo-card" key={repo._id}>
+              <Link
+                to={`/repo/${repo._id}`}
+                className="repo-card repo-card-link-wrapper"
+                key={repo._id}
+              >
                 <h4>{repo.name}</h4>
+
                 {repo.description && <p>{repo.description}</p>}
-              </div>
+              </Link>
             ))}
 
             {searchResults.length === 0 && (

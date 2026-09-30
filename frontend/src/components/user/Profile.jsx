@@ -11,6 +11,9 @@ import { useAuth } from "../../authContext";
 const Profile = () => {
   const navigate = useNavigate();
   const [userDetails, setUserDetails] = useState({ username: "username" });
+  const [starredRepositories, setStarredRepositories] = useState([]);
+
+  const [activeTab, setActiveTab] = useState("overview");
   const { setCurrentUser } = useAuth();
 
   useEffect(() => {
@@ -31,13 +34,38 @@ const Profile = () => {
     fetchUserDetails();
   }, []);
 
+  useEffect(() => {
+    const fetchProfileData = async () => {
+      const userId = localStorage.getItem("userId");
+
+      if (!userId) return;
+
+      try {
+        const [profileResponse, starredResponse] = await Promise.all([
+          axios.get(`http://localhost:3002/userProfile/${userId}`),
+
+          axios.get(`http://localhost:3002/userProfile/${userId}/starred`),
+        ]);
+
+        setUserDetails(profileResponse.data);
+
+        setStarredRepositories(starredResponse.data.starredRepositories || []);
+      } catch (err) {
+        console.error("Cannot fetch profile data: ", err);
+      }
+    };
+
+    fetchProfileData();
+  }, []);
+
   return (
     <>
       <Navbar />
       <UnderlineNav aria-label="Repository">
         <UnderlineNav.Item
-          aria-current="page"
+          aria-current={activeTab === "overview" ? "page" : undefined}
           icon={BookIcon}
+          onClick={() => setActiveTab("overview")}
           sx={{
             backgroundColor: "transparent",
             color: "white",
@@ -51,7 +79,8 @@ const Profile = () => {
         </UnderlineNav.Item>
 
         <UnderlineNav.Item
-          onClick={() => navigate("/repo")}
+          aria-current={activeTab === "starred" ? "page" : undefined}
+          onClick={() => setActiveTab("starred")}
           icon={RepoIcon}
           sx={{
             backgroundColor: "transparent",
@@ -96,8 +125,50 @@ const Profile = () => {
           </div>
         </div>
 
-        <div className="heat-map-section">
-          <HeatMapProfile />
+        <div className="profile-content-section">
+          {activeTab === "overview" ? (
+            <div className="heat-map-section">
+              <HeatMapProfile />
+            </div>
+          ) : (
+            <section className="starred-repo-section">
+              <div className="starred-repo-header">
+                <h2>Starred Repositories</h2>
+
+                <span>{starredRepositories.length} repositories</span>
+              </div>
+
+              {starredRepositories.length > 0 ? (
+                <div className="repo-card-wrapper">
+                  {starredRepositories.map((repo) => (
+                    <Link
+                      to={`/repo/${repo._id}`}
+                      className="repo repo-link"
+                      key={repo._id}
+                    >
+                      <div>
+                        <h3 className="repo-name">{repo.name}</h3>
+
+                        {repo.description && (
+                          <p className="description">{repo.description}</p>
+                        )}
+                      </div>
+
+                      <p className="repo-owner">
+                        {repo.owner?.username || "Unknown owner"}
+                      </p>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <div className="empty-starred-state">
+                  <p>You have not starred any repositories yet.</p>
+
+                  <Link to="/">Browse repositories</Link>
+                </div>
+              )}
+            </section>
+          )}
         </div>
       </div>
     </>
