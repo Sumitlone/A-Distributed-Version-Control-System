@@ -48,45 +48,76 @@
   overflow-wrap: anywhere;
 }
 
-.follow-btn {
-  background-color: #21262d;
-  width: 100%;
-  margin: 22px auto 12px;
-  height: 40px;
-  border: 1px solid #30363d;
-  border-radius: 7px;
-  color: #8b949e;
-  cursor: not-allowed;
-}
-
-.follower {
+.profile-stats {
   display: flex;
   justify-content: center;
-  width: 100%;
-  gap: 12px;
-  margin: 5px auto 20px;
-  flex-wrap: wrap;
+  gap: 10px;
+  margin: 22px 0;
 }
 
-.follower span {
-  color: #8b949e;
-  font-size: 13px;
-}
-
-.profile-logout-btn {
-  width: 100%;
-  height: 38px;
-  margin-top: auto;
+.profile-stats button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 90px;
+  padding: 9px 5px;
   border: 1px solid #30363d;
   border-radius: 7px;
   background: #161b22;
-  color: #f0f6fc;
+  color: #8b949e;
   cursor: pointer;
+}
+
+.profile-stats button:hover {
+  background: #21262d;
+  border-color: #58a6ff;
+}
+
+.profile-stats strong {
+  color: #f0f6fc;
+  font-size: 17px;
+}
+
+.profile-stats span {
+  margin-top: 3px;
+  font-size: 11px;
+}
+
+.profile-settings-btn,
+.profile-logout-btn {
+  width: 100%;
+  height: 38px;
+  box-sizing: border-box;
+  border-radius: 7px;
+  font-size: 13px;
   font-weight: 600;
 }
 
-.profile-logout-btn:hover,
-#logout:hover {
+.profile-settings-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 10px;
+  border: 1px solid #30363d;
+  background: #21262d;
+  color: #f0f6fc;
+  text-decoration: none;
+}
+
+.profile-settings-btn:hover {
+  background: #30363d;
+  color: #ffffff;
+}
+
+.profile-logout-btn {
+  margin-top: auto;
+  border: 1px solid #30363d;
+  background: #161b22;
+  color: #f0f6fc;
+  cursor: pointer;
+}
+
+.profile-logout-btn:hover {
   border-color: #8b949e;
   background: #21262d;
 }
@@ -94,11 +125,11 @@
 .profile-content-section {
   flex: 1;
   min-width: 0;
-  padding: 35px 35px 50px;
+  padding: 35px;
 }
 
 .profile-repositories-section,
-.starred-repo-section,
+.profile-list-section,
 .heat-map-section {
   width: 100%;
   box-sizing: border-box;
@@ -119,7 +150,7 @@
 }
 
 .profile-section-heading p {
-  margin-top: 6px;
+  margin: 6px 0 0;
   color: #8b949e;
   font-size: 13px;
 }
@@ -130,7 +161,6 @@
   justify-content: center;
   min-height: 36px;
   padding: 0 14px;
-  box-sizing: border-box;
   border: 1px solid #238636;
   border-radius: 7px;
   background: #238636;
@@ -148,21 +178,14 @@
 
 .profile-repo-grid {
   display: grid;
-  grid-template-columns: repeat(
-    2,
-    minmax(0, 1fr)
-  );
-  justify-content: stretch;
-  padding: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
 }
 
 .repo {
   border: 1px solid #30363d;
   border-radius: 8px;
-  width: auto;
   min-height: 170px;
-  height: auto;
   padding: 18px;
   box-sizing: border-box;
   display: flex;
@@ -203,20 +226,14 @@
 .repo-link {
   color: inherit;
   text-decoration: none;
-  transition:
-    border-color 0.2s ease,
-    background-color 0.2s ease;
 }
 
 .repo-link:hover {
-  color: inherit;
-  text-decoration: none;
-  background-color: #1c2128;
+  background: #1c2128;
   border-color: #58a6ff;
 }
 
 .profile-visibility-badge {
-  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   height: 22px;
@@ -237,35 +254,88 @@
   border-color: rgba(210, 153, 34, 0.45);
 }
 
-.profile-message {
-  margin: 25px 0;
-  color: #8b949e;
-}
-
-.empty-repo-state,
-.empty-starred-state {
-  padding: 35px 20px;
+.profile-empty-state {
+  padding: 45px 20px;
   text-align: center;
   border: 1px dashed #30363d;
   border-radius: 8px;
   color: #8b949e;
 }
 
-.empty-repo-state p,
-.empty-starred-state p {
+.profile-empty-state p {
   margin: 0 0 12px;
 }
 
-.empty-repo-state a,
-.empty-starred-state a {
+.profile-empty-state a {
   color: #58a6ff;
   text-decoration: none;
+}
+
+.profile-empty-state a:hover {
+  text-decoration: underline;
+}
+
+.profile-user-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.profile-user-card {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 14px;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  background: #161b22;
+  color: #f0f6fc;
+  text-decoration: none;
+}
+
+.profile-user-card:hover {
+  border-color: #58a6ff;
+  background: #1c2128;
+}
+
+.profile-user-avatar {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #21262d;
+  border: 1px solid #30363d;
+  color: #f0f6fc;
+  font-weight: 600;
+}
+
+.profile-user-card div:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.profile-user-card strong {
+  color: #f0f6fc;
   font-size: 14px;
 }
 
-.empty-repo-state a:hover,
-.empty-starred-state a:hover {
-  text-decoration: underline;
+.profile-user-card span {
+  color: #8b949e;
+  font-size: 12px;
+}
+
+.repo-count {
+  min-width: 30px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #21262d;
+  color: #c9d1d9;
+  text-align: center;
+  font-size: 12px;
 }
 
 .heat-map-section {
@@ -274,17 +344,12 @@
   border-top: 1px solid #30363d;
 }
 
-.heatmap-heading {
-  margin-bottom: 12px;
-}
-
-.repo-count {
+.profile-loading {
+  min-height: 70vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: #8b949e;
-  font-size: 13px;
-}
-
-.starred-repo-section .profile-section-heading {
-  margin-bottom: 20px;
 }
 
 @media screen and (max-width: 900px) {
@@ -298,9 +363,15 @@
     border-bottom: 1px solid #30363d;
   }
 
+  .profile-settings-btn,
   .profile-logout-btn {
     width: min(250px, 100%);
-    margin: 10px auto 0;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .profile-logout-btn {
+    margin-top: 10px;
   }
 
   .profile-content-section {
@@ -334,5 +405,9 @@
 
   .profile-repo-title-row {
     flex-direction: column;
+  }
+
+  .profile-stats {
+    gap: 5px;
   }
 }

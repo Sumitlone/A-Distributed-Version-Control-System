@@ -4,10 +4,7 @@ import axios from "axios";
 import "./profile.css";
 import Navbar from "../Navbar";
 import { UnderlineNav } from "@primer/react";
-import {
-  BookIcon,
-  RepoIcon,
-} from "@primer/octicons-react";
+import { BookIcon, RepoIcon } from "@primer/octicons-react";
 import HeatMapProfile from "./HeatMap";
 import { useAuth } from "../../authContext";
 
@@ -17,25 +14,20 @@ const Profile = () => {
   const navigate = useNavigate();
   const { setCurrentUser } = useAuth();
 
-  const [userDetails, setUserDetails] =
-    useState({ username: "username" });
+  const [userDetails, setUserDetails] = useState(null);
+  const [userRepositories, setUserRepositories] = useState([]);
+  const [starredRepositories, setStarredRepositories] = useState([]);
+  const [followers, setFollowers] = useState([]);
+  const [following, setFollowing] = useState([]);
 
-  const [userRepositories, setUserRepositories] =
-    useState([]);
+  const [activeTab, setActiveTab] = useState("overview");
 
-  const [starredRepositories, setStarredRepositories] =
-    useState([]);
-
-  const [activeTab, setActiveTab] =
-    useState("overview");
-
-  const [loadingRepositories, setLoadingRepositories] =
-    useState(true);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const fetchProfileData = async () => {
-      const userId =
-        localStorage.getItem("userId");
+      const userId = localStorage.getItem("userId");
 
       if (!userId) {
         navigate("/auth");
@@ -43,60 +35,49 @@ const Profile = () => {
       }
 
       try {
+        setLoading(true);
+        setError("");
+
         const [
           profileResponse,
-          starredResponse,
           repositoriesResponse,
+          starredResponse,
+          followersResponse,
+          followingResponse,
         ] = await Promise.all([
-          axios.get(
-            `${API_URL}/userProfile/${userId}`,
-          ),
+          axios.get(`${API_URL}/userProfile/${userId}`),
 
-          axios.get(
-            `${API_URL}/userProfile/${userId}/starred`,
-          ),
+          axios.get(`${API_URL}/repo/user/${userId}`).catch((err) => {
+            if (err.response?.status === 404) {
+              return {
+                data: {
+                  repositories: [],
+                },
+              };
+            }
 
-          axios
-            .get(
-              `${API_URL}/repo/user/${userId}`,
-            )
-            .catch((err) => {
-              if (
-                err.response?.status === 404
-              ) {
-                return {
-                  data: {
-                    repositories: [],
-                  },
-                };
-              }
+            throw err;
+          }),
 
-              throw err;
-            }),
+          axios.get(`${API_URL}/userProfile/${userId}/starred`),
+          axios.get(`${API_URL}/userProfile/${userId}/followers`),
+          axios.get(`${API_URL}/userProfile/${userId}/following`),
         ]);
 
-        setUserDetails(
-          profileResponse.data,
-        );
-
-        setStarredRepositories(
-          starredResponse.data
-            .starredRepositories || [],
-        );
-
-        setUserRepositories(
-          repositoriesResponse.data
-            .repositories || [],
-        );
+        setUserDetails(profileResponse.data);
+        setUserRepositories(repositoriesResponse.data.repositories || []);
+        setStarredRepositories(starredResponse.data.starredRepositories || []);
+        setFollowers(followersResponse.data.followers || []);
+        setFollowing(followingResponse.data.following || []);
       } catch (err) {
-        console.error(
-          "Cannot fetch profile data:",
-          err,
+        console.error("Cannot fetch profile data:", err);
+        setError(
+          err.response?.data?.message ||
+            err.response?.data?.error ||
+            "Unable to load profile.",
         );
       } finally {
-        setLoadingRepositories(
-          false,
-        );
+        setLoading(false);
       }
     };
 
@@ -108,323 +89,310 @@ const Profile = () => {
     localStorage.removeItem("userId");
 
     setCurrentUser(null);
-
     navigate("/auth");
   };
+
+  const renderUserList = (users, emptyMessage) => {
+    if (users.length === 0) {
+      return (
+        <div className="profile-empty-state">
+          <p>{emptyMessage}</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="profile-user-list">
+        {users.map((user) => (
+          <Link
+            key={user._id}
+            to={`/user/${user._id}`}
+            className="profile-user-card"
+          >
+            <div className="profile-user-avatar">
+              {user.username?.charAt(0)?.toUpperCase() || "U"}
+            </div>
+
+            <div>
+              <strong>{user.username}</strong>
+
+              <span>View profile</span>
+            </div>
+          </Link>
+        ))}
+      </div>
+    );
+  };
+
+  if (loading) {
+    return (
+      <>
+        <Navbar />
+
+        <main className="profile-loading">Loading profile...</main>
+      </>
+    );
+  }
+
+  if (error || !userDetails) {
+    return (
+      <>
+        <Navbar />
+
+        <main className="profile-loading">
+          <p>{error || "Profile not found."}</p>
+        </main>
+      </>
+    );
+  }
 
   return (
     <>
       <Navbar />
 
-      <UnderlineNav
-        aria-label="Profile navigation"
-        className="profile-tabs"
-      >
+      <UnderlineNav aria-label="Profile navigation" className="profile-tabs">
         <UnderlineNav.Item
-          aria-current={
-            activeTab === "overview"
-              ? "page"
-              : undefined
-          }
+          aria-current={activeTab === "overview" ? "page" : undefined}
           icon={BookIcon}
-          onClick={() =>
-            setActiveTab("overview")
-          }
+          onClick={() => setActiveTab("overview")}
           sx={{
-            backgroundColor:
-              "transparent",
+            backgroundColor: "transparent",
             color: "white",
-            "&:hover": {
-              textDecoration:
-                "underline",
-              color: "white",
-            },
           }}
         >
           Overview
         </UnderlineNav.Item>
 
         <UnderlineNav.Item
-          aria-current={
-            activeTab === "starred"
-              ? "page"
-              : undefined
-          }
-          onClick={() =>
-            setActiveTab("starred")
-          }
+          aria-current={activeTab === "starred" ? "page" : undefined}
           icon={RepoIcon}
+          onClick={() => setActiveTab("starred")}
           sx={{
-            backgroundColor:
-              "transparent",
+            backgroundColor: "transparent",
             color: "whitesmoke",
-            "&:hover": {
-              textDecoration:
-                "underline",
-              color: "white",
-            },
           }}
         >
-          Starred Repositories
+          Starred
+        </UnderlineNav.Item>
+
+        <UnderlineNav.Item
+          aria-current={activeTab === "followers" ? "page" : undefined}
+          onClick={() => setActiveTab("followers")}
+          sx={{
+            backgroundColor: "transparent",
+            color: "whitesmoke",
+          }}
+        >
+          Followers
+        </UnderlineNav.Item>
+
+        <UnderlineNav.Item
+          aria-current={activeTab === "following" ? "page" : undefined}
+          onClick={() => setActiveTab("following")}
+          sx={{
+            backgroundColor: "transparent",
+            color: "whitesmoke",
+          }}
+        >
+          Following
         </UnderlineNav.Item>
       </UnderlineNav>
 
       <div className="profile-page-wrapper">
-
-        {/* Profile sidebar */}
+        {/* Sidebar */}
 
         <aside className="user-profile-section">
-
           <div className="profile-image">
-            <span>
-              {userDetails.username
-                ?.charAt(0)
-                ?.toUpperCase() ||
-                "U"}
-            </span>
+            <span>{userDetails.username?.charAt(0)?.toUpperCase() || "U"}</span>
           </div>
 
           <div className="name">
-            <h3>
-              {userDetails.username}
-            </h3>
+            <h3>{userDetails.username}</h3>
           </div>
 
-          <button
-            className="follow-btn"
-            type="button"
-            disabled
-          >
-            Follow
-          </button>
+          <div className="profile-stats">
+            <button type="button" onClick={() => setActiveTab("followers")}>
+              <strong>{followers.length}</strong>
 
-          <div className="follower">
-            <span>
-              10 Followers
-            </span>
+              <span>Followers</span>
+            </button>
 
-            <span>
-              3 Following
-            </span>
+            <button type="button" onClick={() => setActiveTab("following")}>
+              <strong>{following.length}</strong>
+
+              <span>Following</span>
+            </button>
           </div>
+
+          <Link to="/settings" className="profile-settings-btn">
+            Settings
+          </Link>
 
           <button
             type="button"
             onClick={handleLogout}
-            id="logout"
             className="profile-logout-btn"
           >
             Logout
           </button>
         </aside>
 
-        {/* Main content */}
+        {/* Main */}
 
         <main className="profile-content-section">
-
-          {activeTab === "overview" ? (
+          {activeTab === "overview" && (
             <>
-              {/* User repositories */}
-
               <section className="profile-repositories-section">
-
                 <div className="profile-section-heading">
                   <div>
-                    <h2>
-                      Your Repositories
-                    </h2>
+                    <h2>Your Repositories</h2>
 
-                    <p>
-                      Repositories owned by
-                      your account.
-                    </p>
+                    <p>Repositories owned by your account.</p>
                   </div>
 
-                  <Link
-                    to="/create"
-                    className="profile-create-btn"
-                  >
+                  <Link to="/create" className="profile-create-btn">
                     New repository
                   </Link>
                 </div>
 
-                {loadingRepositories ? (
-                  <p className="profile-message">
-                    Loading repositories...
-                  </p>
-                ) : userRepositories.length >
-                  0 ? (
-                  <div className="repo-card-wrapper profile-repo-grid">
+                {userRepositories.length > 0 ? (
+                  <div className="profile-repo-grid">
+                    {userRepositories.map((repo) => (
+                      <Link
+                        key={repo._id}
+                        to={`/repo/${repo._id}`}
+                        className="repo repo-link"
+                      >
+                        <div>
+                          <div className="profile-repo-title-row">
+                            <h3 className="repo-name">{repo.name}</h3>
 
-                    {userRepositories.map(
-                      (repo) => (
-                        <Link
-                          to={`/repo/${repo._id}`}
-                          className="repo repo-link"
-                          key={repo._id}
-                        >
-                          <div>
-                            <div className="profile-repo-title-row">
-
-                              <h3 className="repo-name">
-                                {repo.name}
-                              </h3>
-
-                              <span
-                                className={`profile-visibility-badge ${
-                                  repo.visibility
-                                    ? "public"
-                                    : "private"
-                                }`}
-                              >
-                                {repo.visibility
-                                  ? "Public"
-                                  : "Private"}
-                              </span>
-                            </div>
-
-                            {repo.description && (
-                              <p className="description">
-                                {repo.description}
-                              </p>
-                            )}
+                            <span
+                              className={`profile-visibility-badge ${
+                                repo.visibility ? "public" : "private"
+                              }`}
+                            >
+                              {repo.visibility ? "Public" : "Private"}
+                            </span>
                           </div>
 
-                          <p className="repo-owner">
-                            {userDetails.username ||
-                              "You"}
-                          </p>
-                        </Link>
-                      ),
-                    )}
+                          {repo.description && (
+                            <p className="description">{repo.description}</p>
+                          )}
+                        </div>
 
+                        <p className="repo-owner">{userDetails.username}</p>
+                      </Link>
+                    ))}
                   </div>
                 ) : (
-                  <div className="empty-repo-state">
-                    <p>
-                      You do not have any
-                      repositories yet.
-                    </p>
+                  <div className="profile-empty-state">
+                    <p>You do not have any repositories yet.</p>
 
-                    <Link to="/create">
-                      Create your first
-                      repository
-                    </Link>
+                    <Link to="/create">Create your first repository</Link>
                   </div>
                 )}
               </section>
 
-              {/* Heatmap */}
-
               <section className="heat-map-section">
-
-                <div className="profile-section-heading heatmap-heading">
+                <div className="profile-section-heading">
                   <div>
-                    <h2>
-                      Contribution Activity
-                    </h2>
+                    <h2>Contribution Activity</h2>
 
-                    <p>
-                      Your current
-                      contribution activity.
-                    </p>
+                    <p>Your contribution activity.</p>
                   </div>
                 </div>
 
                 <HeatMapProfile />
-
               </section>
             </>
-          ) : (
+          )}
 
-            /* Starred repositories */
-
-            <section className="starred-repo-section">
-
+          {activeTab === "starred" && (
+            <section className="profile-list-section">
               <div className="profile-section-heading">
-
                 <div>
-                  <h2>
-                    Starred Repositories
-                  </h2>
+                  <h2>Starred Repositories</h2>
 
-                  <p>
-                    Repositories you have starred.
-                  </p>
+                  <p>Repositories you have starred.</p>
                 </div>
 
-                <span className="repo-count">
-                  {starredRepositories.length}{" "}
-                  repositories
-                </span>
-
+                <span className="repo-count">{starredRepositories.length}</span>
               </div>
 
-              {starredRepositories.length >
-              0 ? (
-                <div className="repo-card-wrapper profile-repo-grid">
+              {starredRepositories.length > 0 ? (
+                <div className="profile-repo-grid">
+                  {starredRepositories.map((repo) => (
+                    <Link
+                      key={repo._id}
+                      to={`/repo/${repo._id}`}
+                      className="repo repo-link"
+                    >
+                      <div>
+                        <div className="profile-repo-title-row">
+                          <h3 className="repo-name">{repo.name}</h3>
 
-                  {starredRepositories.map(
-                    (repo) => (
-                      <Link
-                        to={`/repo/${repo._id}`}
-                        className="repo repo-link"
-                        key={repo._id}
-                      >
-                        <div>
-
-                          <div className="profile-repo-title-row">
-
-                            <h3 className="repo-name">
-                              {repo.name}
-                            </h3>
-
-                            <span
-                              className={`profile-visibility-badge ${
-                                repo.visibility
-                                  ? "public"
-                                  : "private"
-                              }`}
-                            >
-                              {repo.visibility
-                                ? "Public"
-                                : "Private"}
-                            </span>
-
-                          </div>
-
-                          {repo.description && (
-                            <p className="description">
-                              {repo.description}
-                            </p>
-                          )}
-
+                          <span
+                            className={`profile-visibility-badge ${
+                              repo.visibility ? "public" : "private"
+                            }`}
+                          >
+                            {repo.visibility ? "Public" : "Private"}
+                          </span>
                         </div>
 
-                        <p className="repo-owner">
-                          {repo.owner?.username ||
-                            "Unknown owner"}
-                        </p>
-                      </Link>
-                    ),
-                  )}
+                        {repo.description && (
+                          <p className="description">{repo.description}</p>
+                        )}
+                      </div>
 
+                      <p className="repo-owner">
+                        {repo.owner?.username || "Unknown owner"}
+                      </p>
+                    </Link>
+                  ))}
                 </div>
               ) : (
-                <div className="empty-starred-state">
-                  <p>
-                    You have not starred any
-                    repositories yet.
-                  </p>
+                <div className="profile-empty-state">
+                  <p>You have not starred any repositories yet.</p>
 
-                  <Link to="/">
-                    Browse repositories
-                  </Link>
+                  <Link to="/">Browse repositories</Link>
                 </div>
               )}
             </section>
           )}
 
+          {activeTab === "followers" && (
+            <section className="profile-list-section">
+              <div className="profile-section-heading">
+                <div>
+                  <h2>Followers</h2>
+
+                  <p>People who follow you.</p>
+                </div>
+
+                <span className="repo-count">{followers.length}</span>
+              </div>
+
+              {renderUserList(followers, "You do not have any followers yet.")}
+            </section>
+          )}
+
+          {activeTab === "following" && (
+            <section className="profile-list-section">
+              <div className="profile-section-heading">
+                <div>
+                  <h2>Following</h2>
+
+                  <p>People you follow.</p>
+                </div>
+
+                <span className="repo-count">{following.length}</span>
+              </div>
+
+              {renderUserList(following, "You are not following anyone yet.")}
+            </section>
+          )}
         </main>
       </div>
     </>

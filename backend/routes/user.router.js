@@ -19,4 +19,13 @@ userRouter.patch(
   userController.toggleStarRepository,
 );
 
+userRouter.patch(
+  "/userProfile/:userId/follow/:targetUserId",
+  userController.toggleFollowUser,
+);
+
+userRouter.get("/userProfile/:id/followers", userController.getFollowers);
+
+userRouter.get("/userProfile/:id/following", userController.getFollowing);
+
 module.exports = userRouter;

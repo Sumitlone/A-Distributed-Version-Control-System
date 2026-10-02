@@ -4,6 +4,8 @@ import { useRoutes, useNavigate } from "react-router-dom";
 //Pages List
 import Dashboard from "./components/dashboard/Dashboard";
 import Profile from "./components/user/Profile";
+import UserProfile from "./components/user/UserProfile";
+import Settings from "./components/user/Settings";
 import Login from "./components/auth/Login";
 import Signup from "./components/auth/Sigup";
 import RepositoryDetails from "./components/repo/RepositoryDetails";
@@ -55,6 +57,14 @@ const ProjectRoutes = () => {
     {
       path: "/profile",
       element: <Profile />,
+    },
+    {
+      path: "/user/:id",
+      element: <UserProfile />,
+    },
+    {
+      path: "/settings",
+      element: <Settings />,
     },
     {
       path: "/create",

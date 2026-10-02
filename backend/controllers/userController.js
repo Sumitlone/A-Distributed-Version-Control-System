@@ -275,6 +275,134 @@ async function deleteUserProfile(req, res) {
   }
 }
 
+// Follow / unfollow another user
+async function toggleFollowUser(req, res) {
+  const { userId, targetUserId } = req.params;
+
+  try {
+    if (
+      !mongoose.Types.ObjectId.isValid(userId) ||
+      !mongoose.Types.ObjectId.isValid(targetUserId)
+    ) {
+      return res.status(400).json({
+        message: "Invalid user ID!",
+      });
+    }
+
+    if (String(userId) === String(targetUserId)) {
+      return res.status(400).json({
+        message: "You cannot follow yourself!",
+      });
+    }
+
+    const [currentUser, targetUser] = await Promise.all([
+      User.findById(userId),
+      User.findById(targetUserId),
+    ]);
+
+    if (!currentUser) {
+      return res.status(404).json({
+        message: "Current user not found!",
+      });
+    }
+
+    if (!targetUser) {
+      return res.status(404).json({
+        message: "Target user not found!",
+      });
+    }
+
+    const alreadyFollowing = currentUser.followedUsers.some(
+      (user) => String(user) === String(targetUserId),
+    );
+
+    if (alreadyFollowing) {
+      currentUser.followedUsers.pull(targetUserId);
+    } else {
+      currentUser.followedUsers.addToSet(targetUserId);
+    }
+
+    await currentUser.save();
+
+    res.json({
+      message: alreadyFollowing
+        ? "User unfollowed successfully!"
+        : "User followed successfully!",
+
+      following: !alreadyFollowing,
+    });
+  } catch (error) {
+    console.error("Error during follow/unfollow:", error.message);
+
+    res.status(500).send("Server error!");
+  }
+}
+
+// Get followers of a user
+async function getFollowers(req, res) {
+  const { id } = req.params;
+
+  try {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        message: "Invalid user ID!",
+      });
+    }
+
+    const user = await User.findById(id);
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found!",
+      });
+    }
+
+    const followers = await User.find({
+      followedUsers: id,
+    }).select("_id username");
+
+    res.json({
+      followers,
+    });
+  } catch (error) {
+    console.error("Error during fetching followers:", error.message);
+
+    res.status(500).send("Server error!");
+  }
+}
+
+// Get users followed by a user
+async function getFollowing(req, res) {
+  const { id } = req.params;
+
+  try {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        message: "Invalid user ID!",
+      });
+    }
+
+    const user = await User.findById(id).populate(
+      "followedUsers",
+      "_id username",
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found!",
+      });
+    }
+
+    res.json({
+      following: user.followedUsers || [],
+    });
+  } catch (error) {
+    console.error("Error during fetching following users:", error.message);
+
+    res.status(500).send("Server error!");
+  }
+}
+
 module.exports = {
   getAllUsers,
   signup,
@@ -284,4 +412,7 @@ module.exports = {
   deleteUserProfile,
   getStarredRepositories,
   toggleStarRepository,
+  toggleFollowUser,
+  getFollowers,
+  getFollowing,
 };

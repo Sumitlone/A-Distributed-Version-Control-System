@@ -303,7 +303,16 @@ const RepositoryDetails = () => {
 
             <p className="repo-owner">
               Owned by{" "}
-              <strong>{repository.owner?.username || "Unknown user"}</strong>
+              {repository.owner?._id ? (
+                <Link
+                  to={`/user/${repository.owner._id}`}
+                  className="repo-owner-link"
+                >
+                  <strong>{repository.owner.username || "Unknown user"}</strong>
+                </Link>
+              ) : (
+                <strong>Unknown user</strong>
+              )}
             </p>
 
             {repository.description && (
@@ -498,7 +507,6 @@ const RepositoryDetails = () => {
               <p className="empty-state">No content has been added yet.</p>
             )}
           </div>
-          
           {/* Issues */}
           <div className="repo-details-card">
             <div className="repo-card-heading">

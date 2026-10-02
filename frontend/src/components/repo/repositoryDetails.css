@@ -486,3 +486,13 @@
 .view-more-issues {
   margin-top: 15px;
 }
+
+.repo-owner-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.repo-owner-link:hover {
+  color: #58a6ff;
+  text-decoration: underline;
+}
