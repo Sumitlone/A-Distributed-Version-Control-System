@@ -1,14 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../../api/apiClient";
 import "./profile.css";
 import Navbar from "../Navbar";
 import { UnderlineNav } from "@primer/react";
 import { BookIcon, RepoIcon } from "@primer/octicons-react";
 import HeatMapProfile from "./HeatMap";
 import { useAuth } from "../../authContext";
-
-const API_URL = "http://localhost:3002";
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -45,9 +43,9 @@ const Profile = () => {
           followersResponse,
           followingResponse,
         ] = await Promise.all([
-          axios.get(`${API_URL}/userProfile/${userId}`),
+          api.get(`/userProfile/${userId}`),
 
-          axios.get(`${API_URL}/repo/user/${userId}`).catch((err) => {
+          api.get(`/repo/user/${userId}`).catch((err) => {
             if (err.response?.status === 404) {
               return {
                 data: {
@@ -59,9 +57,9 @@ const Profile = () => {
             throw err;
           }),
 
-          axios.get(`${API_URL}/userProfile/${userId}/starred`),
-          axios.get(`${API_URL}/userProfile/${userId}/followers`),
-          axios.get(`${API_URL}/userProfile/${userId}/following`),
+          api.get(`/userProfile/${userId}/starred`),
+          api.get(`/userProfile/${userId}/followers`),
+          api.get(`/userProfile/${userId}/following`),
         ]);
 
         setUserDetails(profileResponse.data);

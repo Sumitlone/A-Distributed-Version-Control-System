@@ -143,10 +143,10 @@ async function ensureRepositoryExists(repoId) {
 }
 
 async function ensureOwner(req, repository) {
-  const userId = req.headers["x-user-id"];
+  const userId = req.user?._id;
 
   if (!userId) {
-    const error = new Error("User ID is required for this operation.");
+    const error = new Error("Authentication required for this operation.");
 
     error.status = 401;
 
@@ -154,7 +154,7 @@ async function ensureOwner(req, repository) {
   }
 
   if (
-    !mongoose.Types.ObjectId.isValid(userId) ||
+    !mongoose.Types.ObjectId.isValid(String(userId)) ||
     String(repository.owner) !== String(userId)
   ) {
     const error = new Error(
@@ -593,12 +593,6 @@ async function pullRepository(req, res) {
 
         localPath = path.join(localCommitDirectory, ...safeFile.split("/"));
       }
-
-      await fs.mkdir(path.dirname(localPath), {
-        recursive: true,
-      });
-
-      await fs.writeFile(localPath, s3Object.Body);
 
       await fs.mkdir(path.dirname(localPath), {
         recursive: true,

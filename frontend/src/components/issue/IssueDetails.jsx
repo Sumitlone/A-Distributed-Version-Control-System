@@ -1,107 +1,58 @@
-import React, {
-  useEffect,
-  useState,
-} from "react";
-import {
-  Link,
-  useNavigate,
-  useParams,
-} from "react-router-dom";
-import axios from "axios";
+import React, { useEffect, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import api from "../../api/apiClient";
 import Navbar from "../Navbar";
 import "./issue.css";
-
-const API_URL = "http://localhost:3002";
+import { useConfirm } from "../common/ConfirmContext";
 
 const IssueDetails = () => {
-  const {
-    id: repositoryId,
-    issueId,
-  } = useParams();
+  const { confirm } = useConfirm();
+  const { id: repositoryId, issueId } = useParams();
 
   const navigate = useNavigate();
 
-  const [issue, setIssue] =
-    useState(null);
-
-  const [repository, setRepository] =
-    useState(null);
-
-  const [loading, setLoading] =
-    useState(true);
-
-  const [error, setError] =
-    useState("");
-
-  const [isEditing, setIsEditing] =
-    useState(false);
-
-  const [editTitle, setEditTitle] =
-    useState("");
-
-  const [editDescription, setEditDescription] =
-    useState("");
-
-  const [editStatus, setEditStatus] =
-    useState("open");
-
-  const [editLoading, setEditLoading] =
-    useState(false);
-
-  const [actionLoading, setActionLoading] =
-    useState(false);
+  const [issue, setIssue] = useState(null);
+  const [repository, setRepository] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editStatus, setEditStatus] = useState("open");
+  const [editLoading, setEditLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
 
   const fetchIssue = async () => {
     try {
       setLoading(true);
       setError("");
 
-      const response = await axios.get(
-        `${API_URL}/issue/${issueId}`,
-      );
+      const response = await api.get(`/issue/${issueId}`);
 
-      const fetchedIssue =
-        response.data.issue ||
-        response.data;
+      const fetchedIssue = response.data.issue || response.data;
 
       setIssue(fetchedIssue);
 
-      setEditTitle(
-        fetchedIssue.title || "",
-      );
+      setEditTitle(fetchedIssue.title || "");
 
-      setEditDescription(
-        fetchedIssue.description || "",
-      );
+      setEditDescription(fetchedIssue.description || "");
 
-      setEditStatus(
-        fetchedIssue.status || "open",
-      );
+      setEditStatus(fetchedIssue.status || "open");
 
       if (
         fetchedIssue.repository &&
-        typeof fetchedIssue.repository ===
-          "object"
+        typeof fetchedIssue.repository === "object"
       ) {
-        setRepository(
-          fetchedIssue.repository,
-        );
+        setRepository(fetchedIssue.repository);
       } else if (repositoryId) {
-        const repositoryResponse =
-          await axios.get(
-            `${API_URL}/repo/${repositoryId}`,
-          );
+        const repositoryResponse = await api.get(`/repo/${repositoryId}`);
 
         setRepository(
-          repositoryResponse.data.repository ||
-            repositoryResponse.data,
+          repositoryResponse.data.repository || repositoryResponse.data,
         );
       }
     } catch (err) {
-      console.error(
-        "Cannot fetch issue:",
-        err,
-      );
+      console.error("Cannot fetch issue:", err);
 
       setError(
         err.response?.data?.error ||
@@ -120,26 +71,19 @@ const IssueDetails = () => {
   const formatDate = (date) => {
     if (!date) return "";
 
-    return new Date(date).toLocaleString(
-      undefined,
-      {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-      },
-    );
+    return new Date(date).toLocaleString(undefined, {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
   };
 
   const handleOpenEdit = () => {
     setEditTitle(issue.title || "");
-    setEditDescription(
-      issue.description || "",
-    );
-    setEditStatus(
-      issue.status || "open",
-    );
+    setEditDescription(issue.description || "");
+    setEditStatus(issue.status || "open");
     setError("");
     setIsEditing(true);
   };
@@ -148,25 +92,18 @@ const IssueDetails = () => {
     if (editLoading) return;
 
     setEditTitle(issue.title || "");
-    setEditDescription(
-      issue.description || "",
-    );
-    setEditStatus(
-      issue.status || "open",
-    );
+    setEditDescription(issue.description || "");
+    setEditStatus(issue.status || "open");
 
     setError("");
     setIsEditing(false);
   };
 
-  const handleUpdateIssue = async (
-    event,
-  ) => {
+  const handleUpdateIssue = async (event) => {
     event.preventDefault();
 
     const cleanTitle = editTitle.trim();
-    const cleanDescription =
-      editDescription.trim();
+    const cleanDescription = editDescription.trim();
 
     if (!cleanTitle) {
       setError("Issue title is required.");
@@ -174,9 +111,7 @@ const IssueDetails = () => {
     }
 
     if (!cleanDescription) {
-      setError(
-        "Issue description is required.",
-      );
+      setError("Issue description is required.");
       return;
     }
 
@@ -184,39 +119,25 @@ const IssueDetails = () => {
       setEditLoading(true);
       setError("");
 
-      const response = await axios.put(
-        `${API_URL}/issue/update/${issueId}`,
-        {
-          title: cleanTitle,
-          description: cleanDescription,
-          status: editStatus,
-        },
-      );
+      const response = await api.put(`/issue/update/${issueId}`, {
+        title: cleanTitle,
+        description: cleanDescription,
+        status: editStatus,
+      });
 
-      const updatedIssue =
-        response.data.issue ||
-        response.data;
+      const updatedIssue = response.data.issue || response.data;
 
       setIssue(updatedIssue);
 
-      setEditTitle(
-        updatedIssue.title || "",
-      );
+      setEditTitle(updatedIssue.title || "");
 
-      setEditDescription(
-        updatedIssue.description || "",
-      );
+      setEditDescription(updatedIssue.description || "");
 
-      setEditStatus(
-        updatedIssue.status || "open",
-      );
+      setEditStatus(updatedIssue.status || "open");
 
       setIsEditing(false);
     } catch (err) {
-      console.error(
-        "Cannot update issue:",
-        err,
-      );
+      console.error("Cannot update issue:", err);
 
       setError(
         err.response?.data?.error ||
@@ -231,38 +152,25 @@ const IssueDetails = () => {
   const handleToggleStatus = async () => {
     if (!issue) return;
 
-    const nextStatus =
-      issue.status === "open"
-        ? "closed"
-        : "open";
+    const nextStatus = issue.status === "open" ? "closed" : "open";
 
     try {
       setActionLoading(true);
       setError("");
 
-      const response = await axios.put(
-        `${API_URL}/issue/update/${issueId}`,
-        {
-          title: issue.title,
-          description: issue.description,
-          status: nextStatus,
-        },
-      );
+      const response = await api.put(`/issue/update/${issueId}`, {
+        title: issue.title,
+        description: issue.description,
+        status: nextStatus,
+      });
 
-      const updatedIssue =
-        response.data.issue ||
-        response.data;
+      const updatedIssue = response.data.issue || response.data;
 
       setIssue(updatedIssue);
 
-      setEditStatus(
-        updatedIssue.status,
-      );
+      setEditStatus(updatedIssue.status);
     } catch (err) {
-      console.error(
-        "Cannot change issue status:",
-        err,
-      );
+      console.error("Cannot change issue status:", err);
 
       setError(
         err.response?.data?.error ||
@@ -277,10 +185,17 @@ const IssueDetails = () => {
   const handleDelete = async () => {
     if (!issue) return;
 
-    const confirmed =
-      window.confirm(
-        `Delete issue "${issue.title}"? This action cannot be undone.`,
-      );
+    const confirmed = await confirm({
+      title: "Delete issue",
+
+      message: `Delete issue "${issue.title}"? This action cannot be undone.`,
+
+      confirmText: "Delete issue",
+
+      cancelText: "Cancel",
+
+      danger: true,
+    });
 
     if (!confirmed) return;
 
@@ -288,18 +203,11 @@ const IssueDetails = () => {
       setActionLoading(true);
       setError("");
 
-      await axios.delete(
-        `${API_URL}/issue/delete/${issueId}`,
-      );
+      await api.delete(`/issue/delete/${issueId}`);
 
-      navigate(
-        `/repo/${repositoryId}/issues`,
-      );
+      navigate(`/repo/${repositoryId}/issues`);
     } catch (err) {
-      console.error(
-        "Cannot delete issue:",
-        err,
-      );
+      console.error("Cannot delete issue:", err);
 
       setError(
         err.response?.data?.error ||
@@ -317,9 +225,7 @@ const IssueDetails = () => {
         <Navbar />
 
         <main className="issue-page">
-          <p className="issue-message">
-            Loading issue...
-          </p>
+          <p className="issue-message">Loading issue...</p>
         </main>
       </>
     );
@@ -331,10 +237,7 @@ const IssueDetails = () => {
         <Navbar />
 
         <main className="issue-page">
-
-          <p className="issue-error">
-            {error}
-          </p>
+          <p className="issue-error">{error}</p>
 
           <button
             type="button"
@@ -343,7 +246,6 @@ const IssueDetails = () => {
           >
             Go Back
           </button>
-
         </main>
       </>
     );
@@ -355,9 +257,7 @@ const IssueDetails = () => {
         <Navbar />
 
         <main className="issue-page">
-          <p className="issue-error">
-            Issue not found.
-          </p>
+          <p className="issue-error">Issue not found.</p>
         </main>
       </>
     );
@@ -368,44 +268,28 @@ const IssueDetails = () => {
       <Navbar />
 
       <main className="issue-page">
-
         <div className="issue-breadcrumb">
+          <Link to="/">Repositories</Link>
 
-          <Link to="/">
-            Repositories
+          <span>/</span>
+
+          <Link to={`/repo/${repositoryId}`}>
+            {repository?.name || "Repository"}
           </Link>
 
           <span>/</span>
 
-          <Link
-            to={`/repo/${repositoryId}`}
-          >
-            {repository?.name ||
-              "Repository"}
-          </Link>
-
-          <span>/</span>
-
-          <Link
-            to={`/repo/${repositoryId}/issues`}
-          >
-            Issues
-          </Link>
+          <Link to={`/repo/${repositoryId}/issues`}>Issues</Link>
 
           <span>/</span>
 
           <span>#{issue._id.slice(-6)}</span>
-
         </div>
 
         <section className="issue-details-card">
-
           <div className="issue-details-header">
-
             <div>
-
               <div className="issue-details-status-title">
-
                 <span
                   className={
                     issue.status === "open"
@@ -413,34 +297,22 @@ const IssueDetails = () => {
                       : "issue-status closed"
                   }
                 >
-                  {issue.status === "open"
-                    ? "Open"
-                    : "Closed"}
+                  {issue.status === "open" ? "Open" : "Closed"}
                 </span>
 
-                <h1>
-                  {issue.title}
-                </h1>
-
+                <h1>{issue.title}</h1>
               </div>
 
               <p className="issue-details-meta">
-                #{issue._id.slice(-6)} · Opened{" "}
-                {formatDate(
-                  issue.createdAt,
-                )}
+                #{issue._id.slice(-6)} · Opened {formatDate(issue.createdAt)}
               </p>
-
             </div>
 
             <div className="issue-action-group">
-
               <button
                 type="button"
                 className="issue-management-btn"
-                onClick={
-                  handleToggleStatus
-                }
+                onClick={handleToggleStatus}
                 disabled={actionLoading}
               >
                 {actionLoading
@@ -465,104 +337,62 @@ const IssueDetails = () => {
                 onClick={handleDelete}
                 disabled={actionLoading}
               >
-                {actionLoading
-                  ? "Working..."
-                  : "Delete"}
+                {actionLoading ? "Working..." : "Delete"}
               </button>
-
             </div>
-
           </div>
 
-          {error && (
-            <p className="issue-inline-error">
-              {error}
-            </p>
-          )}
+          {error && <p className="issue-inline-error">{error}</p>}
 
           {isEditing ? (
             <form
               onSubmit={handleUpdateIssue}
               className="issue-form issue-edit-form"
             >
-
               <div className="issue-form-group">
-
-                <label htmlFor="edit-issue-title">
-                  Title
-                </label>
+                <label htmlFor="edit-issue-title">Title</label>
 
                 <input
                   id="edit-issue-title"
                   type="text"
                   value={editTitle}
-                  onChange={(event) =>
-                    setEditTitle(
-                      event.target.value,
-                    )
-                  }
+                  onChange={(event) => setEditTitle(event.target.value)}
                   maxLength={150}
                   required
                 />
-
               </div>
 
               <div className="issue-form-group">
-
-                <label htmlFor="edit-issue-description">
-                  Description
-                </label>
+                <label htmlFor="edit-issue-description">Description</label>
 
                 <textarea
                   id="edit-issue-description"
-                  value={
-                    editDescription
-                  }
-                  onChange={(event) =>
-                    setEditDescription(
-                      event.target.value,
-                    )
-                  }
+                  value={editDescription}
+                  onChange={(event) => setEditDescription(event.target.value)}
                   rows={9}
                   required
                 />
-
               </div>
 
               <div className="issue-form-group">
-
-                <label htmlFor="edit-issue-status">
-                  Status
-                </label>
+                <label htmlFor="edit-issue-status">Status</label>
 
                 <select
                   id="edit-issue-status"
                   value={editStatus}
-                  onChange={(event) =>
-                    setEditStatus(
-                      event.target.value,
-                    )
-                  }
+                  onChange={(event) => setEditStatus(event.target.value)}
                 >
-                  <option value="open">
-                    Open
-                  </option>
+                  <option value="open">Open</option>
 
-                  <option value="closed">
-                    Closed
-                  </option>
+                  <option value="closed">Closed</option>
                 </select>
-
               </div>
 
               <div className="issue-form-actions">
-
                 <button
                   type="button"
                   className="issue-secondary-btn"
-                  onClick={
-                    handleCancelEdit
-                  }
+                  onClick={handleCancelEdit}
                   disabled={editLoading}
                 >
                   Cancel
@@ -573,48 +403,24 @@ const IssueDetails = () => {
                   className="issue-primary-btn"
                   disabled={editLoading}
                 >
-                  {editLoading
-                    ? "Saving..."
-                    : "Save changes"}
+                  {editLoading ? "Saving..." : "Save changes"}
                 </button>
-
               </div>
-
             </form>
           ) : (
             <div className="issue-description-box">
-
-              <p>
-                {issue.description}
-              </p>
+              <p>{issue.description}</p>
 
               <div className="issue-description-footer">
+                <span>Created {formatDate(issue.createdAt)}</span>
 
-                <span>
-                  Created{" "}
-                  {formatDate(
-                    issue.createdAt,
-                  )}
-                </span>
-
-                {issue.updatedAt &&
-                  issue.updatedAt !==
-                    issue.createdAt && (
-                    <span>
-                      Updated{" "}
-                      {formatDate(
-                        issue.updatedAt,
-                      )}
-                    </span>
-                  )}
-
+                {issue.updatedAt && issue.updatedAt !== issue.createdAt && (
+                  <span>Updated {formatDate(issue.updatedAt)}</span>
+                )}
               </div>
-
             </div>
           )}
-
         </section>
-
       </main>
     </>
   );

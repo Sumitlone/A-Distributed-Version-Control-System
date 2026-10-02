@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import api from "../../api/apiClient";
 import { Link, useNavigate } from "react-router-dom";
 import "./dashboard.css";
 import Navbar from "../Navbar";
@@ -20,9 +20,7 @@ const Dashboard = () => {
 
     const fetchRepositories = async () => {
       try {
-        const response = await axios.get(
-          `http://localhost:3002/repo/user/${userId}`,
-        );
+        const response = await api.get(`/repo/user/${userId}`);
 
         setRepositories(response.data.repositories);
       } catch (err) {
@@ -32,7 +30,7 @@ const Dashboard = () => {
 
     const fetchSuggestedRepositories = async () => {
       try {
-        const response = await axios.get("http://localhost:3002/repo/all");
+        const response = await api.get("/repo/all");
 
         setSuggestedRepositories(response.data);
       } catch (err) {
@@ -44,9 +42,7 @@ const Dashboard = () => {
       if (!userId) return;
 
       try {
-        const response = await axios.get(
-          `http://localhost:3002/userProfile/${userId}/starred`,
-        );
+        const response = await api.get(`/userProfile/${userId}/starred`);
 
         const starredRepositories = response.data.starredRepositories || [];
 
@@ -86,8 +82,7 @@ const Dashboard = () => {
             {suggestedRepositories.map((repo) => {
               const repoId = String(repo._id);
 
-              const isStarred =
-                starredRepoIds.includes(repoId);
+              const isStarred = starredRepoIds.includes(repoId);
 
               const handleStar = async (event) => {
                 /*
@@ -97,21 +92,17 @@ const Dashboard = () => {
                 event.preventDefault();
                 event.stopPropagation();
 
-                const userId =
-                  localStorage.getItem("userId");
+                const userId = localStorage.getItem("userId");
 
-                if (
-                  !userId ||
-                  starLoadingId === repoId
-                ) {
+                if (!userId || starLoadingId === repoId) {
                   return;
                 }
 
                 try {
                   setStarLoadingId(repoId);
 
-                  const response = await axios.patch(
-                    `http://localhost:3002/userProfile/${userId}/star/${repoId}`
+                  const response = await api.patch(
+                    `/userProfile/${userId}/star/${repoId}`,
                   );
 
                   setStarredRepoIds((current) => {
@@ -121,14 +112,12 @@ const Dashboard = () => {
                         : [...current, repoId];
                     }
 
-                    return current.filter(
-                      (id) => id !== repoId
-                    );
+                    return current.filter((id) => id !== repoId);
                   });
                 } catch (err) {
                   console.error(
                     "Error while updating starred repository:",
-                    err
+                    err,
                   );
                 } finally {
                   setStarLoadingId(null);
@@ -136,40 +125,24 @@ const Dashboard = () => {
               };
 
               return (
-                <div
-                  className="repo-card suggested-repo-card"
-                  key={repoId}
-                >
+                <div className="repo-card suggested-repo-card" key={repoId}>
                   {/* Repository */}
-                  <Link
-                    to={`/repo/${repoId}`}
-                    className="repo-card-link"
-                  >
+                  <Link to={`/repo/${repoId}`} className="repo-card-link">
                     <h4>{repo.name}</h4>
 
-                    {repo.description && (
-                      <p>{repo.description}</p>
-                    )}
+                    {repo.description && <p>{repo.description}</p>}
                   </Link>
 
                   {/* Star Button */}
                   <button
                     type="button"
-                    className={`repo-star-btn ${
-                      isStarred ? "starred" : ""
-                    }`}
+                    className={`repo-star-btn ${isStarred ? "starred" : ""}`}
                     onClick={handleStar}
                     disabled={starLoadingId === repoId}
                     aria-label={
-                      isStarred
-                        ? `Unstar ${repo.name}`
-                        : `Star ${repo.name}`
+                      isStarred ? `Unstar ${repo.name}` : `Star ${repo.name}`
                     }
-                    title={
-                      isStarred
-                        ? "Unstar repository"
-                        : "Star repository"
-                    }
+                    title={isStarred ? "Unstar repository" : "Star repository"}
                   >
                     {isStarred ? "★" : "☆"}
                   </button>

@@ -1,10 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import axios from "axios";
+import api from "../../api/apiClient";
 import Navbar from "../Navbar";
 import "./vcs.css";
-
-const API_URL = "http://localhost:3002";
+import { useConfirm } from "../common/ConfirmContext";
 
 const createFileName = (files) => {
   let index = files.length + 1;
@@ -20,6 +19,7 @@ const createFileName = (files) => {
 };
 
 const VcsDashboard = () => {
+  const { confirm } = useConfirm();
   const { id } = useParams();
 
   const navigate = useNavigate();
@@ -68,11 +68,7 @@ const VcsDashboard = () => {
     try {
       setWorkspaceLoading(true);
 
-      const response = await axios.get(`${API_URL}/vcs/${id}/workspace`, {
-        headers: {
-          "x-user-id": userId,
-        },
-      });
+      const response = await api.get(`/vcs/${id}/workspace`);
 
       const workspaceFiles = response.data.files || [];
 
@@ -100,7 +96,7 @@ const VcsDashboard = () => {
         setLoading(true);
         setError("");
 
-        const response = await axios.get(`${API_URL}/repo/${id}`);
+        const response = await api.get(`/repo/${id}`);
 
         setRepository(response.data.repository || response.data);
       } catch (err) {
@@ -153,14 +149,22 @@ const VcsDashboard = () => {
     setError("");
   };
 
-  const handleDeleteFile = () => {
+  const handleDeleteFile = async () => {
     if (!selectedFile) {
       return;
     }
 
-    const confirmed = window.confirm(
-      `Remove ${selectedFile.name} from the workspace?`,
-    );
+    const confirmed = await confirm({
+      title: "Remove file",
+
+      message: `Remove ${selectedFile.name} from the workspace?`,
+
+      confirmText: "Remove file",
+
+      cancelText: "Cancel",
+
+      danger: true,
+    });
 
     if (!confirmed) {
       return;
@@ -212,22 +216,14 @@ const VcsDashboard = () => {
       setError("");
       setNotice("");
 
-      const response = await axios.post(
-        `${API_URL}/vcs/${id}/commit`,
-        {
-          message: message.trim(),
+      const response = await api.post(`/vcs/${id}/commit`, {
+        message: message.trim(),
 
-          files: files.map((file) => ({
-            name: file.name.trim(),
-            content: file.content,
-          })),
-        },
-        {
-          headers: {
-            "x-user-id": userId,
-          },
-        },
-      );
+        files: files.map((file) => ({
+          name: file.name.trim(),
+          content: file.content,
+        })),
+      });
 
       const commit = response.data.commit;
 
@@ -256,15 +252,7 @@ const VcsDashboard = () => {
       setError("");
       setNotice("");
 
-      const response = await axios.post(
-        `${API_URL}/vcs/${id}/push`,
-        {},
-        {
-          headers: {
-            "x-user-id": userId,
-          },
-        },
-      );
+      const response = await api.post(`/vcs/${id}/push`, {});
 
       setNotice(
         `${response.data.message || "Repository pushed successfully."} Bucket: ${response.data.bucket || "unknown"} | Prefix: ${response.data.prefix || "unknown"}`,
@@ -286,9 +274,18 @@ const VcsDashboard = () => {
     }
 
     if (files.length > 0) {
-      const confirmed = window.confirm(
-        "Pulling from S3 will replace the current workspace with the latest remote commit. Continue?",
-      );
+      const confirmed = await confirm({
+        title: "Pull from S3",
+
+        message:
+          "Pulling from S3 will replace the current workspace with the latest remote commit. Continue?",
+
+        confirmText: "Pull changes",
+
+        cancelText: "Cancel",
+
+        danger: true,
+      });
 
       if (!confirmed) {
         return;
@@ -301,15 +298,7 @@ const VcsDashboard = () => {
       setError("");
       setNotice("");
 
-      const response = await axios.post(
-        `${API_URL}/vcs/${id}/pull`,
-        {},
-        {
-          headers: {
-            "x-user-id": userId,
-          },
-        },
-      );
+      const response = await api.post(`/vcs/${id}/pull`, {});
 
       setNotice(
         response.data.message || "Repository pulled from S3 successfully.",

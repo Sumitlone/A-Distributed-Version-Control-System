@@ -3,12 +3,55 @@ const bcrypt = require("bcryptjs");
 const User = require("../models/userModel");
 const dotenv = require("dotenv");
 const Repository = require("../models/repoModel");
+const Issue = require("../models/issueModel");
 const mongoose = require("mongoose");
 
+const fs = require("fs").promises;
+const path = require("path");
+
+const { s3, S3_BUCKET } = require("../config/aws-config");
 // const { MongoClient, ReturnDocument } = require("mongodb");
 // var ObjectId = require("mongodb").ObjectId;
 
 dotenv.config();
+
+async function deleteS3Prefix(prefix) {
+  let continuationToken;
+
+  do {
+    const response = await s3
+      .listObjectsV2({
+        Bucket: S3_BUCKET,
+        Prefix: prefix,
+
+        ...(continuationToken
+          ? {
+              ContinuationToken: continuationToken,
+            }
+          : {}),
+      })
+      .promise();
+
+    const objects = response.Contents || [];
+
+    if (objects.length > 0) {
+      await s3
+        .deleteObjects({
+          Bucket: S3_BUCKET,
+          Delete: {
+            Objects: objects.map((object) => ({
+              Key: object.Key,
+            })),
+          },
+        })
+        .promise();
+    }
+
+    continuationToken = response.IsTruncated
+      ? response.NextContinuationToken
+      : undefined;
+  } while (continuationToken);
+}
 
 // const uri = process.env.MONGODB_URI;
 
@@ -97,7 +140,7 @@ async function login(req, res) {
 // Get all users
 async function getAllUsers(req, res) {
   try {
-    const users = await User.find({});
+    const users = await User.find({}).select("-password");
 
     res.json(users);
   } catch (error) {
@@ -111,7 +154,7 @@ async function getUserProfile(req, res) {
   const currentID = req.params.id;
 
   try {
-    const user = await User.findById(currentID);
+    const user = await User.findById(currentID).select("-password");
 
     if (!user) {
       return res.status(404).json({
@@ -145,6 +188,12 @@ async function updateUserProfile(req, res) {
       updateFields.password = hashedPassword;
     }
 
+    if (Object.keys(updateFields).length === 0) {
+      return res.status(400).json({
+        message: "No profile changes were provided.",
+      });
+    }
+
     const user = await User.findByIdAndUpdate(
       currentID,
       { $set: updateFields },
@@ -160,7 +209,10 @@ async function updateUserProfile(req, res) {
       });
     }
 
-    res.json(user);
+    const safeUser = user.toObject();
+    delete safeUser.password;
+
+    res.json(safeUser);
   } catch (error) {
     console.error("Error during updating:", error.message);
     res.status(500).send("Server error!");
@@ -186,13 +238,29 @@ async function getStarredRepositories(req, res) {
       });
     }
 
+    const isOwnProfile = String(id) === String(req.user._id);
+
+    const visibleRepositories = (user.starRepos || []).filter((repository) => {
+      if (!repository) {
+        return false;
+      }
+
+      if (isOwnProfile) {
+        return true;
+      }
+
+      return Boolean(repository.visibility);
+    });
+
     res.json({
-      starredRepositories: user.starRepos || [],
+      starredRepositories: visibleRepositories,
     });
   } catch (error) {
     console.error("Error during fetching starred repositories:", error.message);
 
-    res.status(500).send("Server error!");
+    res.status(500).json({
+      message: "Server error!",
+    });
   }
 }
 
@@ -227,6 +295,14 @@ async function toggleStarRepository(req, res) {
       });
     }
 
+    const isOwner = String(repository.owner) === String(user._id);
+
+    if (!repository.visibility && !isOwner) {
+      return res.status(403).json({
+        message: "Private repositories cannot be starred.",
+      });
+    }
+
     const alreadyStarred = user.starRepos.some(
       (repo) => repo.toString() === repoId,
     );
@@ -258,20 +334,147 @@ async function deleteUserProfile(req, res) {
   const currentID = req.params.id;
 
   try {
-    const user = await User.findByIdAndDelete(currentID);
-
-    if (!user) {
-      return res.status(404).json({
-        message: "User not found",
+    if (!mongoose.Types.ObjectId.isValid(currentID)) {
+      return res.status(400).json({
+        message: "Invalid user ID!",
       });
     }
 
+    /*
+      Find the user first.
+      Do NOT delete the user yet because
+      we need their repository IDs.
+    */
+    const user = await User.findById(currentID);
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found!",
+      });
+    }
+
+    /*
+      Find every repository owned
+      by this user.
+    */
+    const repositories = await Repository.find({
+      owner: currentID,
+    }).select("_id");
+
+    const repositoryIds = repositories.map((repository) => repository._id);
+
+    /*
+      Remove remote and local VCS data
+      for every owned repository.
+    */
+    for (const repositoryId of repositoryIds) {
+      const repoId = String(repositoryId);
+
+      /*
+        Current web VCS structure:
+        repositories/<repoId>/...
+      */
+      await deleteS3Prefix(`repositories/${repoId}/`);
+
+      /*
+        Older web VCS structure:
+        commits/<repoId>/...
+      */
+      await deleteS3Prefix(`commits/${repoId}/`);
+
+      /*
+        Remove local server-side
+        VCS workspace.
+      */
+      const localRepoPath = path.resolve(process.cwd(), ".vcsRepos", repoId);
+
+      await fs.rm(localRepoPath, {
+        recursive: true,
+        force: true,
+      });
+    }
+
+    /*
+      Delete issues belonging to
+      all repositories owned by user.
+    */
+    if (repositoryIds.length > 0) {
+      await Issue.deleteMany({
+        repository: {
+          $in: repositoryIds,
+        },
+      });
+    }
+
+    /*
+      Remove deleted repositories from
+      users' repository/star references.
+    */
+    if (repositoryIds.length > 0) {
+      await User.updateMany(
+        {},
+        {
+          $pull: {
+            repositories: {
+              $in: repositoryIds,
+            },
+
+            starRepos: {
+              $in: repositoryIds,
+            },
+          },
+        },
+      );
+    }
+
+    /*
+      Delete the repository documents.
+    */
+    if (repositoryIds.length > 0) {
+      await Repository.deleteMany({
+        _id: {
+          $in: repositoryIds,
+        },
+      });
+    }
+
+    /*
+      Remove this user from everybody's
+      following lists.
+    */
+    await User.updateMany(
+      {
+        _id: {
+          $ne: currentID,
+        },
+      },
+      {
+        $pull: {
+          followedUsers: currentID,
+        },
+      },
+    );
+
+    /*
+      Finally delete the user.
+    */
+    await User.findByIdAndDelete(currentID);
+
     res.json({
-      message: "User Profile Deleted!",
+      message:
+        "Account, repositories, issues, and VCS data deleted successfully!",
     });
   } catch (error) {
-    console.error("Error during deleting:", error.message);
-    res.status(500).send("Server error!");
+    console.error("Error during account deletion:", error.message);
+
+    /*
+      If S3/local/database cleanup fails,
+      do not claim the account was deleted.
+    */
+    res.status(500).json({
+      message: "Account deletion failed. Your account was not deleted.",
+      error: error.message,
+    });
   }
 }
 

@@ -9,7 +9,8 @@ const Issue = require("../models/issueModel");
 const { s3, S3_BUCKET } = require("../config/aws-config");
 
 async function createRepository(req, res) {
-  const { owner, name, issues, content, description, visibility } = req.body;
+  const { name, description, visibility } = req.body;
+  const owner = req.user?._id;
 
   try {
     if (!name) {
@@ -21,12 +22,17 @@ async function createRepository(req, res) {
     }
 
     const newRepository = new Repository({
-      name,
-      description,
-      visibility,
+      name: String(name).trim(),
+
+      description: description ? String(description).trim() : "",
+
+      visibility: Boolean(visibility),
+
       owner,
-      content,
-      issues,
+
+      content: [],
+
+      issues: [],
     });
 
     const result = await newRepository.save();
@@ -43,7 +49,16 @@ async function createRepository(req, res) {
 
 async function getAllRepositories(req, res) {
   try {
-    const repositories = await Repository.find({})
+    const repositories = await Repository.find({
+      $or: [
+        {
+          visibility: true,
+        },
+        {
+          owner: req.user._id,
+        },
+      ],
+    })
       .populate("owner", "username")
       .populate("issues");
 
@@ -73,6 +88,16 @@ async function fetchRepositoryById(req, res) {
       });
     }
 
+    if (
+      !repository.visibility &&
+      String(repository.owner._id || repository.owner) !== String(req.user._id)
+    ) {
+      return res.status(403).json({
+        error:
+          "This repository is private and can only be viewed by its owner.",
+      });
+    }
+
     res.json({
       repository,
     });
@@ -85,8 +110,18 @@ async function fetchRepositoryById(req, res) {
 async function fetchRepositoryByName(req, res) {
   const { name } = req.params;
   try {
-    const repository = await Repository.find({ name })
-      .populate("owner")
+    const repository = await Repository.find({
+      name,
+      $or: [
+        {
+          visibility: true,
+        },
+        {
+          owner: req.user._id,
+        },
+      ],
+    })
+      .populate("owner", "username")
       .populate("issues");
 
     res.json(repository);
@@ -100,7 +135,18 @@ async function fetchRepositoriesForCurrentUser(req, res) {
   const { userID } = req.params;
 
   try {
-    const repositories = await Repository.find({ owner: userID });
+    const repositories = await Repository.find({
+      owner: userID,
+
+      $or: [
+        {
+          visibility: true,
+        },
+        {
+          owner: req.user._id,
+        },
+      ],
+    });
 
     if (!repositories || repositories.length == 0) {
       return res.status(404).json({ error: "User Repositories not found!" });

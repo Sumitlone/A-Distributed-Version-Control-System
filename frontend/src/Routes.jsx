@@ -1,13 +1,15 @@
 import React, { useEffect } from "react";
-import { useRoutes, useNavigate } from "react-router-dom";
+import { useRoutes, useNavigate, useLocation } from "react-router-dom";
 
 //Pages List
 import Dashboard from "./components/dashboard/Dashboard";
 import Profile from "./components/user/Profile";
 import UserProfile from "./components/user/UserProfile";
 import Settings from "./components/user/Settings";
+
 import Login from "./components/auth/Login";
 import Signup from "./components/auth/Sigup";
+
 import RepositoryDetails from "./components/repo/RepositoryDetails";
 import CreateRepository from "./components/repo/CreateRepository";
 
@@ -19,39 +21,32 @@ import IssueList from "./components/issue/IssueList";
 import CreateIssue from "./components/issue/CreateIssue";
 import IssueDetails from "./components/issue/IssueDetails";
 
-//Auth Context
-import { useAuth } from "./authContext";
+import ProtectedRoute from "./components/common/ProtectedRoute";
 
 const ProjectRoutes = () => {
-  const { currentUser, setCurrentUser } = useAuth();
   const navigate = useNavigate();
 
+  const location = useLocation();
+
   useEffect(() => {
-    const userIdFromStorage = localStorage.getItem("userId");
+    const token = localStorage.getItem("token");
 
-    if (userIdFromStorage && !currentUser) {
-      setCurrentUser(userIdFromStorage);
+    if (token && ["/auth", "/signup"].includes(location.pathname)) {
+      navigate("/", {
+        replace: true,
+      });
     }
+  }, [location.pathname, navigate]);
 
-    if (
-      !userIdFromStorage &&
-      !["/auth", "/signup"].includes(window.location.pathname)
-    ) {
-      navigate("/auth"); //login
-    }
+  const protect = (element) => <ProtectedRoute>{element}</ProtectedRoute>;
 
-    if (userIdFromStorage && window.location.pathname == "/auth") {
-      navigate("/");
-    }
-  }, [currentUser, navigate, setCurrentUser]);
-
-  let element = useRoutes([
+  return useRoutes([
     {
       path: "/",
-      element: <Dashboard />,
+      element: protect(<Dashboard />),
     },
     {
-      path: "/auth", //login
+      path: "/auth",
       element: <Login />,
     },
     {
@@ -60,51 +55,49 @@ const ProjectRoutes = () => {
     },
     {
       path: "/profile",
-      element: <Profile />,
+      element: protect(<Profile />),
     },
     {
       path: "/user/:id",
-      element: <UserProfile />,
+      element: protect(<UserProfile />),
     },
     {
       path: "/settings",
-      element: <Settings />,
+      element: protect(<Settings />),
     },
     {
       path: "/create",
-      element: <CreateRepository />,
+      element: protect(<CreateRepository />),
     },
     {
       path: "/repo/:id",
-      element: <RepositoryDetails />,
+      element: protect(<RepositoryDetails />),
     },
     {
       path: "/repo/:id/vcs",
-      element: <VcsDashboard />,
+      element: protect(<VcsDashboard />),
     },
     {
       path: "/repo/:id/vcs/history",
-      element: <CommitHistory />,
+      element: protect(<CommitHistory />),
     },
     {
       path: "/repo/:id/vcs/commits/:commitId",
-      element: <CommitDetails />,
+      element: protect(<CommitDetails />),
     },
     {
       path: "/repo/:id/issues",
-      element: <IssueList />,
+      element: protect(<IssueList />),
     },
     {
       path: "/repo/:id/issues/new",
-      element: <CreateIssue />,
+      element: protect(<CreateIssue />),
     },
     {
       path: "/repo/:id/issues/:issueId",
-      element: <IssueDetails />,
+      element: protect(<IssueDetails />),
     },
   ]);
-
-  return element;
 };
 
 export default ProjectRoutes;

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import api from "../../api/apiClient";
 import { useAuth } from "../../authContext";
+import Alert from "../common/Alert";
 
 import { Button } from "@primer/react";
 import "./auth.css";
@@ -18,28 +19,40 @@ const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const { currentUser, setCurrentUser } = useAuth();
+  const { login } = useAuth();
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const authMessage = sessionStorage.getItem("authMessage");
+
+    if (authMessage) {
+      setError(authMessage);
+
+      sessionStorage.removeItem("authMessage");
+    }
+  }, []);
 
   const handleLogin = async (e) => {
     e.preventDefault();
 
     try {
       setLoading(true);
-      const res = await axios.post("http://localhost:3002/login", {
-        email: email,
-        password: password,
+      const res = await api.post("/login", {
+        email,
+        password,
       });
 
-      localStorage.setItem("token", res.data.token);
-      localStorage.setItem("userId", res.data.userId);
+      login(res.data.token, res.data.userId);
 
-      setCurrentUser(res.data.userId);
-      setLoading(false);
-
-      window.location.href = "/";
+      window.location.replace("/");
     } catch (err) {
       console.error(err);
-      alert("Login Failed!");
+
+      setError(
+        err.response?.data?.message ||
+          "Login failed. Please check your credentials.",
+      );
+    } finally {
       setLoading(false);
     }
   };
@@ -55,6 +68,11 @@ const Login = () => {
           <h1>Sign In</h1>
         </div>
         <div className="login-box">
+          {error && (
+            <Alert type="error" onClose={() => setError("")}>
+              {error}
+            </Alert>
+          )}
           <div>
             <label className="label">Email address</label>
             <input

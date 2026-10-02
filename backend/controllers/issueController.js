@@ -2,6 +2,30 @@ const mongoose = require("mongoose");
 const Repository = require("../models/repoModel");
 const Issue = require("../models/issueModel");
 
+function isRepositoryOwner(repository, userId) {
+  return repository && userId && String(repository.owner) === String(userId);
+}
+
+async function ensureCanViewRepository(req, repository) {
+  if (!repository) {
+    const error = new Error("Repository not found!");
+
+    error.status = 404;
+
+    throw error;
+  }
+
+  if (!repository.visibility && !isRepositoryOwner(repository, req.user?._id)) {
+    const error = new Error(
+      "This repository is private and can only be viewed by its owner.",
+    );
+
+    error.status = 403;
+
+    throw error;
+  }
+}
+
 async function createIssue(req, res) {
   const { title, description } = req.body;
   const { id } = req.params;
@@ -38,9 +62,7 @@ async function createIssue(req, res) {
     repository.issues.push(issue._id);
     await repository.save();
 
-    const populatedIssue = await Issue.findById(
-      issue._id,
-    ).populate({
+    const populatedIssue = await Issue.findById(issue._id).populate({
       path: "repository",
       select: "name owner visibility",
       populate: {
@@ -54,10 +76,7 @@ async function createIssue(req, res) {
       issue: populatedIssue,
     });
   } catch (error) {
-    console.error(
-      "Error during issue creation:",
-      error.message,
-    );
+    console.error("Error during issue creation:", error.message);
 
     res.status(500).send("Server error");
   }
@@ -84,18 +103,13 @@ async function upadteIssueById(req, res) {
       issue.description = description.trim();
     }
 
-    if (
-      status !== undefined &&
-      ["open", "closed"].includes(status)
-    ) {
+    if (status !== undefined && ["open", "closed"].includes(status)) {
       issue.status = status;
     }
 
     await issue.save();
 
-    const updatedIssue = await Issue.findById(
-      issue._id,
-    ).populate({
+    const updatedIssue = await Issue.findById(issue._id).populate({
       path: "repository",
       select: "name owner visibility",
       populate: {
@@ -109,10 +123,7 @@ async function upadteIssueById(req, res) {
       issue: updatedIssue,
     });
   } catch (error) {
-    console.error(
-      "Error during issue updation:",
-      error.message,
-    );
+    console.error("Error during issue updation:", error.message);
 
     res.status(500).send("Server error");
   }
@@ -130,14 +141,11 @@ async function deleteIssueById(req, res) {
       });
     }
 
-    await Repository.findByIdAndUpdate(
-      issue.repository,
-      {
-        $pull: {
-          issues: issue._id,
-        },
+    await Repository.findByIdAndUpdate(issue.repository, {
+      $pull: {
+        issues: issue._id,
       },
-    );
+    });
 
     await Issue.findByIdAndDelete(id);
 
@@ -145,10 +153,7 @@ async function deleteIssueById(req, res) {
       message: "Issue deleted successfully!",
     });
   } catch (error) {
-    console.error(
-      "Error during issue deletion:",
-      error.message,
-    );
+    console.error("Error during issue deletion:", error.message);
 
     res.status(500).send("Server error");
   }
@@ -172,6 +177,8 @@ async function getAllIssues(req, res) {
       });
     }
 
+    await ensureCanViewRepository(req, repository);
+
     const issues = await Issue.find({
       repository: id,
     }).sort({
@@ -180,12 +187,11 @@ async function getAllIssues(req, res) {
 
     res.status(200).json(issues);
   } catch (err) {
-    console.error(
-      "Error during issue fetching:",
-      err.message,
-    );
+    console.error("Error during issue fetching:", err.message);
 
-    res.status(500).send("Server error");
+    res.status(err.status || 500).json({
+      message: err.message || "Server error",
+    });
   }
 }
 
@@ -214,14 +220,15 @@ async function getIssueById(req, res) {
       });
     }
 
+    await ensureCanViewRepository(req, issue.repository);
+
     res.json(issue);
   } catch (err) {
-    console.error(
-      "Error during issue fetching:",
-      err.message,
-    );
+    console.error("Error during issue fetching:", err.message);
 
-    res.status(500).send("Server error");
+    res.status(err.status || 500).json({
+      message: err.message || "Server error",
+    });
   }
 }
 

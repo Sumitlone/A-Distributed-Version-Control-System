@@ -1,10 +1,8 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../../api/apiClient";
 import Navbar from "../Navbar";
 import "./createRepository.css";
-
-const API_URL = "http://localhost:3002";
 
 const CreateRepository = () => {
   const navigate = useNavigate();
@@ -14,7 +12,6 @@ const CreateRepository = () => {
     description: "",
     visibility: true,
   });
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -59,7 +56,7 @@ const CreateRepository = () => {
       setLoading(true);
       setError("");
 
-      const response = await axios.post(`${API_URL}/repo/create`, {
+      const response = await api.post(`/repo/create`, {
         owner: userId,
         name,
         description,

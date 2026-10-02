@@ -2,11 +2,9 @@ import React, { useEffect, useState } from "react";
 
 import { Link, useNavigate, useParams } from "react-router-dom";
 
-import axios from "axios";
+import api from "../../api/apiClient";
 import Navbar from "../Navbar";
 import "./vcs.css";
-
-const API_URL = "http://localhost:3002";
 
 const CommitHistory = () => {
   const { id } = useParams();
@@ -14,11 +12,8 @@ const CommitHistory = () => {
   const navigate = useNavigate();
 
   const [repository, setRepository] = useState(null);
-
   const [commits, setCommits] = useState([]);
-
   const [loading, setLoading] = useState(true);
-
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -28,9 +23,9 @@ const CommitHistory = () => {
         setError("");
 
         const [repoResponse, historyResponse] = await Promise.all([
-          axios.get(`${API_URL}/repo/${id}`),
+          api.get(`/repo/${id}`),
 
-          axios.get(`${API_URL}/vcs/${id}/commits`),
+          api.get(`/vcs/${id}/commits`),
         ]);
 
         setRepository(repoResponse.data.repository || repoResponse.data);

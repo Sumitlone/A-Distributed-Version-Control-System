@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import api from "../../api/apiClient";
 import { useAuth } from "../../authContext";
+import Alert from "../common/Alert";
 
 import { Button } from "@primer/react";
 import "./auth.css";
@@ -13,30 +14,31 @@ const Signup = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const { setCurrentUser } = useAuth();
+  const { login } = useAuth();
 
   const handleSignup = async (e) => {
     e.preventDefault();
 
     try {
       setLoading(true);
-      const res = await axios.post("http://localhost:3002/signup", {
-        email: email,
-        password: password,
-        username: username,
+      const res = await api.post("/signup", {
+        email,
+        password,
+        username,
       });
 
-      localStorage.setItem("token", res.data.token);
-      localStorage.setItem("userId", res.data.userId);
+      login(res.data.token, res.data.userId);
 
-      setCurrentUser(res.data.userId);
-      setLoading(false);
-
-      window.location.href = "/";
+      window.location.replace("/");
     } catch (err) {
       console.error(err);
-      alert("Signup Failed!");
+
+      setError(
+        err.response?.data?.message || "Signup failed. Please try again.",
+      );
+    } finally {
       setLoading(false);
     }
   };
@@ -53,6 +55,11 @@ const Signup = () => {
         </div>
 
         <div className="login-box">
+          {error && (
+            <Alert type="error" onClose={() => setError("")}>
+              {error}
+            </Alert>
+          )}
           <div>
             <label className="label">Username</label>
             <input

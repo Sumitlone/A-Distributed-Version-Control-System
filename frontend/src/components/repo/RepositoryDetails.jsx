@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import axios from "axios";
+import api from "../../api/apiClient";
 import Navbar from "../Navbar";
 import "./repositoryDetails.css";
-
-const API_URL = "http://localhost:3002";
+import { useConfirm } from "../common/ConfirmContext";
 
 const RepositoryDetails = () => {
+  const { confirm } = useConfirm();
   const { id } = useParams();
   const navigate = useNavigate();
 
@@ -34,7 +34,7 @@ const RepositoryDetails = () => {
         setLoading(true);
         setError("");
 
-        const response = await axios.get(`${API_URL}/repo/${id}`);
+        const response = await api.get(`/repo/${id}`);
 
         const repo = response.data.repository || response.data;
 
@@ -61,9 +61,7 @@ const RepositoryDetails = () => {
       if (!userId || !id) return;
 
       try {
-        const response = await axios.get(
-          `${API_URL}/userProfile/${userId}/starred`,
-        );
+        const response = await api.get(`/userProfile/${userId}/starred`);
 
         const starredRepos = response.data.starredRepositories || [];
 
@@ -100,9 +98,7 @@ const RepositoryDetails = () => {
     try {
       setStarLoading(true);
 
-      const response = await axios.patch(
-        `${API_URL}/userProfile/${userId}/star/${id}`,
-      );
+      const response = await api.patch(`/userProfile/${userId}/star/${id}`);
 
       setIsStarred(Boolean(response.data.starred));
     } catch (err) {
@@ -143,7 +139,7 @@ const RepositoryDetails = () => {
       setEditLoading(true);
       setEditError("");
 
-      const response = await axios.put(`${API_URL}/repo/update/${id}`, {
+      const response = await api.put(`/repo/update/${id}`, {
         description,
         ...(contentItem ? { content: contentItem } : {}),
       });
@@ -188,7 +184,7 @@ const RepositoryDetails = () => {
     try {
       setVisibilityLoading(true);
 
-      const response = await axios.patch(`${API_URL}/repo/toggle/${id}`);
+      const response = await api.patch(`/repo/toggle/${id}`);
 
       const updatedRepository = response.data.repository;
 
@@ -216,9 +212,17 @@ const RepositoryDetails = () => {
   const handleDeleteRepository = async () => {
     if (!isOwner || !id) return;
 
-    const confirmed = window.confirm(
-      `Delete repository "${repository.name}"? This action cannot be undone.`,
-    );
+    const confirmed = await confirm({
+      title: "Delete repository",
+
+      message: `Delete repository "${repository.name}"? This action cannot be undone.`,
+
+      confirmText: "Delete repository",
+
+      cancelText: "Cancel",
+
+      danger: true,
+    });
 
     if (!confirmed) return;
 
@@ -226,7 +230,7 @@ const RepositoryDetails = () => {
       setDeleteLoading(true);
       setError("");
 
-      await axios.delete(`${API_URL}/repo/delete/${id}`);
+      await api.delete(`/repo/delete/${id}`);
 
       navigate("/");
     } catch (err) {

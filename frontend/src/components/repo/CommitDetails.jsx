@@ -2,13 +2,13 @@ import React, { useEffect, useState } from "react";
 
 import { Link, useNavigate, useParams } from "react-router-dom";
 
-import axios from "axios";
+import api from "../../api/apiClient";
 import Navbar from "../Navbar";
 import "./vcs.css";
-
-const API_URL = "http://localhost:3002";
+import { useConfirm } from "../common/ConfirmContext";
 
 const CommitDetails = () => {
+  const { confirm } = useConfirm();
   const { id, commitId } = useParams();
 
   const navigate = useNavigate();
@@ -16,15 +16,10 @@ const CommitDetails = () => {
   const userId = localStorage.getItem("userId");
 
   const [repository, setRepository] = useState(null);
-
   const [commit, setCommit] = useState(null);
-
   const [loading, setLoading] = useState(true);
-
   const [actionLoading, setActionLoading] = useState(false);
-
   const [error, setError] = useState("");
-
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
@@ -34,9 +29,9 @@ const CommitDetails = () => {
         setError("");
 
         const [repoResponse, commitResponse] = await Promise.all([
-          axios.get(`${API_URL}/repo/${id}`),
+          api.get(`/repo/${id}`),
 
-          axios.get(`${API_URL}/vcs/${id}/commits/${commitId}`),
+          api.get(`/vcs/${id}/commits/${commitId}`),
         ]);
 
         setRepository(repoResponse.data.repository || repoResponse.data);
@@ -77,9 +72,17 @@ const CommitDetails = () => {
       return;
     }
 
-    const confirmed = window.confirm(
-      `Revert the workspace to commit "${commit.message}"? The workspace will be replaced with this commit's files.`,
-    );
+    const confirmed = await confirm({
+      title: "Revert workspace",
+
+      message: `Revert the workspace to commit "${commit.message}"? The current workspace will be replaced with this commit's files.`,
+
+      confirmText: "Revert",
+
+      cancelText: "Cancel",
+
+      danger: true,
+    });
 
     if (!confirmed) {
       return;
@@ -91,15 +94,7 @@ const CommitDetails = () => {
       setError("");
       setNotice("");
 
-      const response = await axios.post(
-        `${API_URL}/vcs/${id}/revert/${commitId}`,
-        {},
-        {
-          headers: {
-            "x-user-id": userId,
-          },
-        },
-      );
+      const response = await api.post(`/vcs/${id}/revert/${commitId}`);
 
       setNotice(response.data.message || "Workspace reverted successfully.");
     } catch (err) {

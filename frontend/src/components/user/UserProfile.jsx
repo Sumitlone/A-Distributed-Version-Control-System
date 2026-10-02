@@ -1,10 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import axios from "axios";
+import api from "../../api/apiClient";
 import Navbar from "../Navbar";
 import "./userProfile.css";
-
-const API_URL = "http://localhost:3002";
 
 const UserProfile = () => {
   const { id } = useParams();
@@ -40,9 +38,9 @@ const UserProfile = () => {
           followingResponse,
           currentUserResponse,
         ] = await Promise.all([
-          axios.get(`${API_URL}/userProfile/${id}`),
+          api.get(`/userProfile/${id}`),
 
-          axios.get(`${API_URL}/repo/user/${id}`).catch((err) => {
+          api.get(`/repo/user/${id}`).catch((err) => {
             if (err.response?.status === 404) {
               return {
                 data: {
@@ -54,12 +52,12 @@ const UserProfile = () => {
             throw err;
           }),
 
-          axios.get(`${API_URL}/userProfile/${id}/followers`),
+          api.get(`/userProfile/${id}/followers`),
 
-          axios.get(`${API_URL}/userProfile/${id}/following`),
+          api.get(`/userProfile/${id}/following`),
 
           currentUserId
-            ? axios.get(`${API_URL}/userProfile/${currentUserId}`)
+            ? api.get(`/userProfile/${currentUserId}`)
             : Promise.resolve({
                 data: null,
               }),
@@ -106,8 +104,8 @@ const UserProfile = () => {
       setFollowLoading(true);
       setError("");
 
-      const response = await axios.patch(
-        `${API_URL}/userProfile/${currentUserId}/follow/${id}`,
+      const response = await api.patch(
+        `/userProfile/${currentUserId}/follow/${id}`,
       );
 
       const followingState = Boolean(response.data.following);
