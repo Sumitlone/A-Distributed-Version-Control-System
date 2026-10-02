@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../../api/apiClient";
 import Navbar from "../Navbar";
 import "./Settings.css";
 import { useAuth } from "../../authContext";
-
-const API_URL = "http://localhost:3002";
+import { useConfirm } from "../common/ConfirmContext";
 
 const Settings = () => {
+  const { confirm } = useConfirm();
   const navigate = useNavigate();
   const { setCurrentUser } = useAuth();
 
@@ -31,7 +31,7 @@ const Settings = () => {
       }
 
       try {
-        const response = await axios.get(`${API_URL}/userProfile/${userId}`);
+        const response = await api.get(`/userProfile/${userId}`);
 
         setUser(response.data);
         setEmail(response.data.email || "");
@@ -72,7 +72,7 @@ const Settings = () => {
       setError("");
       setSuccess("");
 
-      const response = await axios.put(`${API_URL}/updateProfile/${userId}`, {
+      const response = await api.put(`/updateProfile/${userId}`, {
         email: email.trim(),
         ...(password ? { password } : {}),
       });
@@ -103,9 +103,18 @@ const Settings = () => {
 
     if (!userId) return;
 
-    const confirmed = window.confirm(
-      "Are you sure you want to delete your account? This action cannot be undone.",
-    );
+    const confirmed = await confirm({
+      title: "Delete account",
+
+      message:
+        "Are you sure you want to delete your account? This action cannot be undone.",
+
+      confirmText: "Delete account",
+
+      cancelText: "Cancel",
+
+      danger: true,
+    });
 
     if (!confirmed) return;
 
@@ -113,7 +122,7 @@ const Settings = () => {
       setDeleting(true);
       setError("");
 
-      await axios.delete(`${API_URL}/deleteProfile/${userId}`);
+      await api.delete(`/deleteProfile/${userId}`);
 
       localStorage.removeItem("token");
       localStorage.removeItem("userId");
