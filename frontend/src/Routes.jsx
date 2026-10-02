@@ -11,6 +11,10 @@ import Signup from "./components/auth/Sigup";
 import RepositoryDetails from "./components/repo/RepositoryDetails";
 import CreateRepository from "./components/repo/CreateRepository";
 
+import VcsDashboard from "./components/repo/VcsDashboard";
+import CommitHistory from "./components/repo/CommitHistory";
+import CommitDetails from "./components/repo/CommitDetails";
+
 import IssueList from "./components/issue/IssueList";
 import CreateIssue from "./components/issue/CreateIssue";
 import IssueDetails from "./components/issue/IssueDetails";
@@ -73,6 +77,18 @@ const ProjectRoutes = () => {
     {
       path: "/repo/:id",
       element: <RepositoryDetails />,
+    },
+    {
+      path: "/repo/:id/vcs",
+      element: <VcsDashboard />,
+    },
+    {
+      path: "/repo/:id/vcs/history",
+      element: <CommitHistory />,
+    },
+    {
+      path: "/repo/:id/vcs/commits/:commitId",
+      element: <CommitDetails />,
     },
     {
       path: "/repo/:id/issues",

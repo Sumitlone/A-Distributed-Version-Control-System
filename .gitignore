@@ -1,4 +1,5 @@
 backend/.env
 backend/node_modules
 backend/.initFold
+backend/.vcsRepos
 frontend/node_modules

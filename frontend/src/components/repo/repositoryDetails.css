@@ -496,3 +496,12 @@
   color: #58a6ff;
   text-decoration: underline;
 }
+
+.vcs-management-btn {
+  color: #58a6ff;
+}
+
+.vcs-management-btn:hover {
+  color: #ffffff;
+  border-color: #58a6ff;
+}

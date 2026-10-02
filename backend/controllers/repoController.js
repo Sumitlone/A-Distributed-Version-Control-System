@@ -1,7 +1,12 @@
 const mongoose = require("mongoose");
+const fs = require("fs").promises;
+const path = require("path");
+
 const Repository = require("../models/repoModel");
 const User = require("../models/userModel");
 const Issue = require("../models/issueModel");
+
+const { s3, S3_BUCKET } = require("../config/aws-config");
 
 async function createRepository(req, res) {
   const { owner, name, issues, content, description, visibility } = req.body;
@@ -165,18 +170,125 @@ async function toggleVisibilityById(req, res) {
   }
 }
 
-async function deleteRepositoryById(req, res) {
-  const { id } = req.params;
-  try {
-    const repository = await Repository.findByIdAndDelete(id);
-    if (!repository) {
-      return res.status(404).json({ error: "Repository not found!" });
+async function deleteS3Prefix(prefix) {
+  let continuationToken;
+
+  do {
+    const response = await s3
+      .listObjectsV2({
+        Bucket: S3_BUCKET,
+        Prefix: prefix,
+
+        ...(continuationToken
+          ? {
+              ContinuationToken: continuationToken,
+            }
+          : {}),
+      })
+      .promise();
+
+    const objects = response.Contents || [];
+
+    if (objects.length > 0) {
+      await s3
+        .deleteObjects({
+          Bucket: S3_BUCKET,
+          Delete: {
+            Objects: objects.map((object) => ({
+              Key: object.Key,
+            })),
+          },
+        })
+        .promise();
     }
 
-    res.json({ message: "Repository deleted successfully!" });
+    continuationToken = response.IsTruncated
+      ? response.NextContinuationToken
+      : undefined;
+  } while (continuationToken);
+}
+
+async function deleteRepositoryById(req, res) {
+  const { id } = req.params;
+
+  try {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        error: "Invalid Repository ID!",
+      });
+    }
+
+    const repository = await Repository.findById(id);
+
+    if (!repository) {
+      return res.status(404).json({
+        error: "Repository not found!",
+      });
+    }
+
+    /*
+      Delete the current web VCS storage:
+      repositories/<repoId>/commits/...
+    */
+    await deleteS3Prefix(`repositories/${id}/`);
+
+    /*
+      Also remove the old web-VCS layout
+      if this repository was pushed before
+      the S3 structure was changed.
+    */
+    await deleteS3Prefix(`commits/${id}/`);
+
+    /*
+      Remove local VCS workspace/cache.
+      This is local server data, not the
+      authoritative remote repository.
+    */
+    const localRepoPath = path.resolve(process.cwd(), ".vcsRepos", String(id));
+
+    await fs.rm(localRepoPath, {
+      recursive: true,
+      force: true,
+    });
+
+    /*
+      Delete issues belonging to the repository.
+    */
+    await Issue.deleteMany({
+      repository: id,
+    });
+
+    /*
+      Remove repository references from users:
+      - repositories
+      - starred repositories
+    */
+    await User.updateMany(
+      {},
+      {
+        $pull: {
+          repositories: id,
+          starRepos: id,
+        },
+      },
+    );
+
+    /*
+      Finally delete the repository document.
+    */
+    await Repository.findByIdAndDelete(id);
+
+    res.json({
+      message: "Repository and its remote/local VCS data deleted successfully!",
+    });
   } catch (err) {
-    console.error("Error during deleting repository : ", err.message);
-    res.status(500).send("Server error");
+    console.error("Error during deleting repository:", err.message);
+
+    res.status(500).json({
+      message:
+        "Repository deletion failed. The repository was not removed from MongoDB.",
+      error: err.message,
+    });
   }
 }
 

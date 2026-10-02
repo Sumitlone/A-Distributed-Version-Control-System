@@ -352,6 +352,15 @@ const RepositoryDetails = () => {
             <div className="management-actions">
               <button
                 type="button"
+                className="management-btn vcs-management-btn"
+                onClick={() => navigate(`/repo/${id}/vcs`)}
+                disabled={editLoading || deleteLoading || visibilityLoading}
+              >
+                Version Control
+              </button>
+
+              <button
+                type="button"
                 className="management-btn"
                 onClick={handleStartEdit}
                 disabled={editLoading || deleteLoading || visibilityLoading}

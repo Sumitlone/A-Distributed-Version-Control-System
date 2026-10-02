@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import Navbar from "../Navbar";
-import "./settings.css";
+import "./Settings.css";
 import { useAuth } from "../../authContext";
 
 const API_URL = "http://localhost:3002";
