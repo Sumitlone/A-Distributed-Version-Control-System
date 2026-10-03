@@ -12,44 +12,58 @@ const vcsRouter = express.Router();
 
 vcsRouter.use(authMiddleware);
 
-/* Workspace modifications */
+/* VCS status */
+
+vcsRouter.get(
+  "/vcs/:repoId/status",
+  authorizeRepositoryOwner,
+  vcsController.getVcsStatus,
+);
+
+/* Workspace */
 
 vcsRouter.get(
   "/vcs/:repoId/workspace",
   authorizeRepositoryOwner,
   vcsController.getWorkspace,
 );
+
+/* Commits */
+
 vcsRouter.post(
-  "/vcs/:repoId/commit",
+  "/vcs/:repoId/commits",
   authorizeRepositoryOwner,
   vcsController.createCommit,
 );
-
-/* Commit history can be viewed by authenticated users */
 
 vcsRouter.get(
   "/vcs/:repoId/commits",
   authorizeRepositoryViewer,
   vcsController.getCommitHistory,
 );
+
 vcsRouter.get(
   "/vcs/:repoId/commits/:commitId",
   authorizeRepositoryViewer,
   vcsController.getCommitDetails,
 );
 
-/* Remote/local modifications */
+/* Remote synchronization */
 
 vcsRouter.post(
   "/vcs/:repoId/push",
   authorizeRepositoryOwner,
   vcsController.pushRepository,
 );
+
 vcsRouter.post(
   "/vcs/:repoId/pull",
   authorizeRepositoryOwner,
   vcsController.pullRepository,
 );
+
+/* Revert creates a new commit */
+
 vcsRouter.post(
   "/vcs/:repoId/revert/:commitId",
   authorizeRepositoryOwner,

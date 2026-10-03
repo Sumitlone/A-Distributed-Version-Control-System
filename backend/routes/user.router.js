@@ -13,6 +13,7 @@ userRouter.post("/login", userController.login);
 /* Everything below requires JWT */
 userRouter.use(authMiddleware);
 userRouter.get("/allUsers", userController.getAllUsers);
+userRouter.get("/users/search", userController.searchUsers);
 userRouter.get("/userProfile/:id", userController.getUserProfile);
 userRouter.put(
   "/updateProfile/:id",

@@ -1,0 +1,210 @@
+.repo-settings-page {
+  width: min(900px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 35px 0 60px;
+  color: #f0f6fc;
+}
+
+.repo-settings-breadcrumb a {
+  color: #58a6ff;
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.repo-settings-page h1 {
+  margin: 18px 0 0;
+  color: #f0f6fc;
+  font-size: 30px;
+}
+
+.repo-settings-subtitle {
+  margin-top: 7px;
+  color: #8b949e;
+  font-size: 13px;
+}
+
+.repo-settings-card,
+.repo-settings-danger {
+  margin-top: 20px;
+  padding: 22px;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  background: #161b22;
+}
+
+.repo-settings-card h2,
+.repo-settings-danger h2 {
+  margin: 0;
+  color: #f0f6fc;
+  font-size: 18px;
+}
+
+.repo-settings-card p,
+.repo-settings-danger p {
+  margin-top: 7px;
+  color: #8b949e;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.repo-settings-group {
+  margin-top: 18px;
+}
+
+.repo-settings-group label {
+  display: block;
+  margin-bottom: 7px;
+  color: #f0f6fc;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.repo-settings-group input,
+.repo-settings-group textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #30363d;
+  border-radius: 7px;
+  background: #0d1117;
+  color: #f0f6fc;
+  outline: none;
+  font: inherit;
+  font-size: 13px;
+  padding: 10px 11px;
+}
+
+.repo-settings-group input {
+  height: 40px;
+}
+
+.repo-settings-group textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.repo-settings-group input:focus,
+.repo-settings-group textarea:focus {
+  border-color: #58a6ff;
+}
+
+.repo-settings-group input:disabled {
+  color: #8b949e;
+  background: #21262d;
+}
+
+.repo-settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+
+.repo-settings-primary,
+.repo-settings-secondary,
+.repo-settings-danger-btn {
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 7px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.repo-settings-primary {
+  border: 1px solid #238636;
+  background: #238636;
+  color: #fff;
+}
+
+.repo-settings-secondary {
+  margin-top: 14px;
+  border: 1px solid #30363d;
+  background: #21262d;
+  color: #f0f6fc;
+}
+
+.repo-settings-primary:disabled,
+.repo-settings-secondary:disabled,
+.repo-settings-danger-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.repo-settings-danger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  border-color: #f85149;
+  background: rgba(248, 81, 73, 0.04);
+}
+
+.repo-settings-danger-btn {
+  flex: 0 0 auto;
+  border: 1px solid #f85149;
+  background: transparent;
+  color: #ff7b72;
+}
+
+.repo-settings-danger-btn:hover {
+  background: #da3633;
+  color: #fff;
+}
+
+.repo-settings-alert {
+  margin-top: 18px;
+  padding: 11px 13px;
+  border-radius: 7px;
+  font-size: 13px;
+}
+
+.repo-settings-alert.error {
+  border: 1px solid #f85149;
+  background: rgba(248, 81, 73, 0.08);
+  color: #ff7b72;
+}
+
+.repo-settings-alert.success {
+  border: 1px solid #238636;
+  background: rgba(46, 160, 67, 0.08);
+  color: #3fb950;
+}
+
+.repo-settings-skeleton {
+  height: 110px;
+  margin-bottom: 14px;
+  border-radius: 8px;
+  background: #21262d;
+  animation: repoSettingsPulse 1.2s infinite ease-in-out;
+}
+
+.repo-settings-skeleton.short {
+  width: 55%;
+  height: 42px;
+}
+
+@keyframes repoSettingsPulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 650px) {
+  .repo-settings-page {
+    width: calc(100% - 24px);
+  }
+
+  .repo-settings-danger {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .repo-settings-danger-btn {
+    width: 100%;
+  }
+}

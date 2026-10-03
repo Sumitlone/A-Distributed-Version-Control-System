@@ -16,6 +16,7 @@ import CreateRepository from "./components/repo/CreateRepository";
 import VcsDashboard from "./components/repo/VcsDashboard";
 import CommitHistory from "./components/repo/CommitHistory";
 import CommitDetails from "./components/repo/CommitDetails";
+import RepositorySettings from "./components/repo/RepositorySettings";
 
 import IssueList from "./components/issue/IssueList";
 import CreateIssue from "./components/issue/CreateIssue";
@@ -76,6 +77,10 @@ const ProjectRoutes = () => {
     {
       path: "/repo/:id/vcs",
       element: protect(<VcsDashboard />),
+    },
+    {
+      path: "/repo/:id/settings",
+      element: protect(<RepositorySettings />),
     },
     {
       path: "/repo/:id/vcs/history",

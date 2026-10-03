@@ -1,0 +1,47 @@
+.repository-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 20px;
+  border-bottom: 1px solid #30363d;
+}
+
+.repository-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 42px;
+  padding: 0 13px;
+  color: #8b949e;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.repository-tab:hover {
+  color: #f0f6fc;
+}
+
+.repository-tab.active {
+  color: #f0f6fc;
+}
+
+.repository-tab.active::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: -1px;
+  height: 2px;
+  background: #f78166;
+}
+
+@media (max-width: 500px) {
+  .repository-tabs {
+    overflow-x: auto;
+  }
+
+  .repository-tab {
+    flex: 0 0 auto;
+  }
+}

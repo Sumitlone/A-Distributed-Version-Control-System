@@ -5,22 +5,32 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import api from "../../api/apiClient";
 import Navbar from "../Navbar";
 import "./vcs.css";
+
 import { useConfirm } from "../common/ConfirmContext";
+
+const shortCommitId = (commitId) =>
+  commitId ? commitId.slice(0, 8) : "unknown";
 
 const CommitDetails = () => {
   const { confirm } = useConfirm();
+
   const { id, commitId } = useParams();
 
   const navigate = useNavigate();
 
-  const userId = localStorage.getItem("userId");
-
   const [repository, setRepository] = useState(null);
+
   const [commit, setCommit] = useState(null);
+
   const [loading, setLoading] = useState(true);
+
   const [actionLoading, setActionLoading] = useState(false);
+
   const [error, setError] = useState("");
+
   const [notice, setNotice] = useState("");
+
+  const [revertCommitId, setRevertCommitId] = useState(null);
 
   useEffect(() => {
     const fetchCommit = async () => {
@@ -68,16 +78,16 @@ const CommitDetails = () => {
   };
 
   const handleRevert = async () => {
-    if (!commit || !userId) {
+    if (!commit) {
       return;
     }
 
     const confirmed = await confirm({
-      title: "Revert workspace",
+      title: "Create revert commit",
 
-      message: `Revert the workspace to commit "${commit.message}"? The current workspace will be replaced with this commit's files.`,
+      message: `Create a new commit that restores the workspace to "${commit.message}"? This will preserve history and will need to be pushed to S3.`,
 
-      confirmText: "Revert",
+      confirmText: "Create revert",
 
       cancelText: "Cancel",
 
@@ -93,14 +103,27 @@ const CommitDetails = () => {
 
       setError("");
       setNotice("");
+      setRevertCommitId(null);
 
-      const response = await api.post(`/vcs/${id}/revert/${commitId}`);
+      const response = await api.post(`/vcs/${id}/revert/${commitId}`, {});
 
-      setNotice(response.data.message || "Workspace reverted successfully.");
+      const newCommit = response.data.commit;
+
+      if (newCommit?.commitId) {
+        setRevertCommitId(newCommit.commitId);
+      }
+
+      setNotice(
+        `Revert commit ${shortCommitId(
+          newCommit?.commitId,
+        )} created locally. Push it to synchronize the reverted state with S3.`,
+      );
     } catch (err) {
       console.error("Cannot revert commit:", err);
 
-      setError(err.response?.data?.message || "Unable to revert commit.");
+      setError(
+        err.response?.data?.message || "Unable to create revert commit.",
+      );
     } finally {
       setActionLoading(false);
     }
@@ -156,13 +179,25 @@ const CommitDetails = () => {
 
           <span>/</span>
 
-          <span>{commit.commitId.slice(0, 8)}</span>
+          <span>{shortCommitId(commit.commitId)}</span>
         </div>
 
         <section className="commit-details-card">
           <div className="commit-details-header">
             <div>
-              <h1>{commit.message || "No commit message"}</h1>
+              <div className="commit-details-title-row">
+                <h1>{commit.message || "No commit message"}</h1>
+
+                <span
+                  className={
+                    commit.pushed
+                      ? "vcs-commit-badge pushed"
+                      : "vcs-commit-badge local"
+                  }
+                >
+                  {commit.pushed ? "Remote" : "Unpushed"}
+                </span>
+              </div>
 
               <p>{commit.commitId}</p>
 
@@ -175,11 +210,24 @@ const CommitDetails = () => {
               onClick={handleRevert}
               disabled={actionLoading}
             >
-              {actionLoading ? "Reverting..." : "Revert to this commit"}
+              {actionLoading ? "Creating revert..." : "Create revert commit"}
             </button>
           </div>
 
-          {notice && <div className="vcs-success">{notice}</div>}
+          {notice && (
+            <div className="vcs-success">
+              {notice}
+
+              {revertCommitId && (
+                <Link
+                  to={`/repo/${id}/vcs/commits/${revertCommitId}`}
+                  className="vcs-inline-link"
+                >
+                  View revert commit
+                </Link>
+              )}
+            </div>
+          )}
 
           {error && <div className="vcs-error">{error}</div>}
 
@@ -189,7 +237,17 @@ const CommitDetails = () => {
               {commit.files.length !== 1 ? "s" : ""}
             </span>
 
-            <span>Snapshot created {formatDate(commit.date)}</span>
+            <span>
+              Parent: <strong>{shortCommitId(commit.parent)}</strong>
+            </span>
+
+            {commit.reverts && (
+              <span>
+                Reverts: <strong>{shortCommitId(commit.reverts)}</strong>
+              </span>
+            )}
+
+            <span>Created {formatDate(commit.date)}</span>
           </div>
 
           <div className="commit-files-list">

@@ -1,12 +1,13 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import api from "../../api/apiClient";
 import Navbar from "../Navbar";
+import RepositoryTabs from "./RepositoryTabs";
+import ReadmeViewer from "./ReadmeViewer";
+import RepositoryActivity from "./RepositoryActivity";
 import "./repositoryDetails.css";
-import { useConfirm } from "../common/ConfirmContext";
 
 const RepositoryDetails = () => {
-  const { confirm } = useConfirm();
   const { id } = useParams();
   const navigate = useNavigate();
 
@@ -19,15 +20,6 @@ const RepositoryDetails = () => {
   const [isStarred, setIsStarred] = useState(false);
   const [starLoading, setStarLoading] = useState(false);
 
-  const [isEditing, setIsEditing] = useState(false);
-  const [editDescription, setEditDescription] = useState("");
-  const [newContent, setNewContent] = useState("");
-  const [editLoading, setEditLoading] = useState(false);
-  const [editError, setEditError] = useState("");
-
-  const [visibilityLoading, setVisibilityLoading] = useState(false);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-
   useEffect(() => {
     const fetchRepository = async () => {
       try {
@@ -39,7 +31,6 @@ const RepositoryDetails = () => {
         const repo = response.data.repository || response.data;
 
         setRepository(repo);
-        setEditDescription(repo.description || "");
       } catch (err) {
         console.error("Cannot fetch repository:", err);
 
@@ -76,17 +67,6 @@ const RepositoryDetails = () => {
     fetchStarredStatus();
   }, [id, userId]);
 
-  const ownerId = useMemo(() => {
-    if (!repository?.owner) {
-      return null;
-    }
-
-    return typeof repository.owner === "object"
-      ? String(repository.owner._id)
-      : String(repository.owner);
-  }, [repository]);
-
-  const isOwner = Boolean(userId && ownerId === String(userId));
 
   const content = Array.isArray(repository?.content) ? repository.content : [];
 
@@ -105,144 +85,6 @@ const RepositoryDetails = () => {
       console.error("Cannot update starred repository:", err);
     } finally {
       setStarLoading(false);
-    }
-  };
-
-  const handleStartEdit = () => {
-    setEditDescription(repository.description || "");
-
-    setNewContent("");
-    setEditError("");
-    setIsEditing(true);
-  };
-
-  const handleCancelEdit = () => {
-    if (editLoading) return;
-
-    setEditDescription(repository.description || "");
-
-    setNewContent("");
-    setEditError("");
-    setIsEditing(false);
-  };
-
-  const handleSaveEdit = async (event) => {
-    event.preventDefault();
-
-    if (!isOwner) return;
-
-    const description = editDescription.trim();
-
-    const contentItem = newContent.trim();
-
-    try {
-      setEditLoading(true);
-      setEditError("");
-
-      const response = await api.put(`/repo/update/${id}`, {
-        description,
-        ...(contentItem ? { content: contentItem } : {}),
-      });
-
-      const updatedRepository =
-        response.data.repository || response.data.updatedRepository;
-
-      if (updatedRepository) {
-        setRepository(updatedRepository);
-
-        setEditDescription(updatedRepository.description || "");
-      } else {
-        setRepository((current) => ({
-          ...current,
-          description,
-          ...(contentItem
-            ? {
-                content: [...(current.content || []), contentItem],
-              }
-            : {}),
-        }));
-      }
-
-      setNewContent("");
-      setIsEditing(false);
-    } catch (err) {
-      console.error("Cannot update repository:", err);
-
-      setEditError(
-        err.response?.data?.error ||
-          err.response?.data?.message ||
-          "Unable to update repository.",
-      );
-    } finally {
-      setEditLoading(false);
-    }
-  };
-
-  const handleToggleVisibility = async () => {
-    if (!isOwner || !id) return;
-
-    try {
-      setVisibilityLoading(true);
-
-      const response = await api.patch(`/repo/toggle/${id}`);
-
-      const updatedRepository = response.data.repository;
-
-      if (updatedRepository) {
-        setRepository(updatedRepository);
-      } else {
-        setRepository((current) => ({
-          ...current,
-          visibility: !current.visibility,
-        }));
-      }
-    } catch (err) {
-      console.error("Cannot toggle repository visibility:", err);
-
-      setError(
-        err.response?.data?.error ||
-          err.response?.data?.message ||
-          "Unable to change repository visibility.",
-      );
-    } finally {
-      setVisibilityLoading(false);
-    }
-  };
-
-  const handleDeleteRepository = async () => {
-    if (!isOwner || !id) return;
-
-    const confirmed = await confirm({
-      title: "Delete repository",
-
-      message: `Delete repository "${repository.name}"? This action cannot be undone.`,
-
-      confirmText: "Delete repository",
-
-      cancelText: "Cancel",
-
-      danger: true,
-    });
-
-    if (!confirmed) return;
-
-    try {
-      setDeleteLoading(true);
-      setError("");
-
-      await api.delete(`/repo/delete/${id}`);
-
-      navigate("/");
-    } catch (err) {
-      console.error("Cannot delete repository:", err);
-
-      setError(
-        err.response?.data?.error ||
-          err.response?.data?.message ||
-          "Unable to delete repository.",
-      );
-
-      setDeleteLoading(false);
     }
   };
 
@@ -337,138 +179,11 @@ const RepositoryDetails = () => {
           </button>
         </div>
 
+        <RepositoryTabs />
+
+        <ReadmeViewer repoId={id} />
         {error && <p className="repo-inline-error">{error}</p>}
 
-        {/* Management */}
-
-        <section className="repo-management-bar">
-          <div className="management-summary">
-            <strong>Repository management</strong>
-
-            <span>
-              {isOwner
-                ? "You are the owner of this repository."
-                : "You can view this repository."}
-            </span>
-          </div>
-
-          {isOwner && (
-            <div className="management-actions">
-              <button
-                type="button"
-                className="management-btn vcs-management-btn"
-                onClick={() => navigate(`/repo/${id}/vcs`)}
-                disabled={editLoading || deleteLoading || visibilityLoading}
-              >
-                Version Control
-              </button>
-
-              <button
-                type="button"
-                className="management-btn"
-                onClick={handleStartEdit}
-                disabled={editLoading || deleteLoading || visibilityLoading}
-              >
-                Edit
-              </button>
-
-              <button
-                type="button"
-                className="management-btn"
-                onClick={handleToggleVisibility}
-                disabled={visibilityLoading || editLoading || deleteLoading}
-              >
-                {visibilityLoading
-                  ? "Updating..."
-                  : repository.visibility
-                    ? "Make private"
-                    : "Make public"}
-              </button>
-
-              <button
-                type="button"
-                className="management-btn danger"
-                onClick={handleDeleteRepository}
-                disabled={deleteLoading || editLoading || visibilityLoading}
-              >
-                {deleteLoading ? "Deleting..." : "Delete"}
-              </button>
-            </div>
-          )}
-        </section>
-
-        {/* Edit */}
-
-        {isEditing && isOwner && (
-          <section className="repo-edit-card">
-            <div className="repo-edit-heading">
-              <h2>Edit Repository</h2>
-
-              <button
-                type="button"
-                className="close-edit-btn"
-                onClick={handleCancelEdit}
-                disabled={editLoading}
-                aria-label="Close edit form"
-              >
-                ×
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveEdit}>
-              <div className="edit-form-group">
-                <label htmlFor="edit-description">Description</label>
-
-                <textarea
-                  id="edit-description"
-                  value={editDescription}
-                  onChange={(event) => setEditDescription(event.target.value)}
-                  rows={4}
-                  maxLength={500}
-                  placeholder="Describe your repository"
-                />
-              </div>
-
-              <div className="edit-form-group">
-                <label htmlFor="new-content">Add content item</label>
-
-                <textarea
-                  id="new-content"
-                  value={newContent}
-                  onChange={(event) => setNewContent(event.target.value)}
-                  rows={3}
-                  placeholder="Optional: add a file name or content entry"
-                />
-
-                <small>
-                  This follows your current backend model, where repository
-                  content is stored as an array of strings.
-                </small>
-              </div>
-
-              {editError && <p className="repo-inline-error">{editError}</p>}
-
-              <div className="edit-actions">
-                <button
-                  type="button"
-                  className="management-btn"
-                  onClick={handleCancelEdit}
-                  disabled={editLoading}
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="submit"
-                  className="save-edit-btn"
-                  disabled={editLoading}
-                >
-                  {editLoading ? "Saving..." : "Save changes"}
-                </button>
-              </div>
-            </form>
-          </section>
-        )}
 
         {/* Repository information */}
 
@@ -581,6 +296,7 @@ const RepositoryDetails = () => {
             )}
           </div>{" "}
         </section>
+        <RepositoryActivity repoId={id} />
       </main>
     </>
   );

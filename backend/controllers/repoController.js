@@ -60,7 +60,9 @@ async function getAllRepositories(req, res) {
       ],
     })
       .populate("owner", "username")
-      .populate("issues");
+      .select("name description visibility owner createdAt")
+      .sort({ createdAt: -1 })
+      .limit(25);
 
     res.json(repositories);
   } catch (error) {
@@ -104,6 +106,40 @@ async function fetchRepositoryById(req, res) {
   } catch (error) {
     console.error("Error during fetching repository : ", error.message);
     res.status(500).send("Server error");
+  }
+}
+
+async function searchRepositories(req, res) {
+  const q = String(req.query.q || "").trim();
+
+  try {
+    if (!q) {
+      return res.json([]);
+    }
+
+    const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+
+    const repositories = await Repository.find({
+      $and: [
+        {
+          $or: [{ name: regex }, { description: regex }],
+        },
+        {
+          $or: [{ visibility: true }, { owner: req.user._id }],
+        },
+      ],
+    })
+      .populate("owner", "username")
+      .select("name description visibility owner createdAt")
+      .limit(25);
+
+    res.json(repositories);
+  } catch (error) {
+    console.error("Error during repository search:", error.message);
+
+    res.status(500).json({
+      message: "Server error.",
+    });
   }
 }
 
@@ -341,6 +377,7 @@ async function deleteRepositoryById(req, res) {
 module.exports = {
   createRepository,
   getAllRepositories,
+  searchRepositories,
   fetchRepositoryById,
   fetchRepositoryByName,
   fetchRepositoriesForCurrentUser,

@@ -1,0 +1,36 @@
+.vcs-tree {
+  padding: 7px 0;
+}
+
+.vcs-tree-node {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 30px;
+  border: 0;
+  background: transparent;
+  color: #8b949e;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  font-size: 12px;
+}
+
+.vcs-tree-node:hover,
+.vcs-tree-node.selected {
+  background: #21262d;
+  color: #f0f6fc;
+}
+
+.vcs-tree-icon {
+  width: 11px;
+  flex: 0 0 11px;
+  color: #6e7681;
+}
+
+.vcs-tree-empty {
+  margin: 10px 14px;
+  color: #6e7681;
+  font-size: 12px;
+}

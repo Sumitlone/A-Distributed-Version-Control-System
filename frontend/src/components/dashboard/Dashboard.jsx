@@ -1,208 +1,379 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import api from "../../api/apiClient";
-import { Link, useNavigate } from "react-router-dom";
 import "./dashboard.css";
 import Navbar from "../Navbar";
+import Alert from "../common/Alert";
 
 const Dashboard = () => {
-  const navigate = useNavigate();
-
   const [repositories, setRepositories] = useState([]);
-  const [searchQuery, setSearchQuery] = useState("");
   const [suggestedRepositories, setSuggestedRepositories] = useState([]);
-  const [searchResults, setSearchResults] = useState([]);
-
   const [starredRepoIds, setStarredRepoIds] = useState([]);
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchType, setSearchType] = useState("repositories");
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [searchError, setSearchError] = useState("");
   const [starLoadingId, setStarLoadingId] = useState(null);
 
   useEffect(() => {
     const userId = localStorage.getItem("userId");
 
-    const fetchRepositories = async () => {
+    const fetchDashboard = async () => {
       try {
-        const response = await api.get(`/repo/user/${userId}`);
+        setLoading(true);
+        setError("");
 
-        setRepositories(response.data.repositories);
+        const [
+          repoResponse,
+          suggestedResponse,
+          starredResponse,
+          statsResponse,
+        ] = await Promise.all([
+          api.get(`/repo/user/${userId}`).catch((err) => {
+            if (err.response?.status === 404) {
+              return { data: { repositories: [] } };
+            }
+            throw err;
+          }),
+          api.get("/repo/all"),
+          api.get(`/userProfile/${userId}/starred`),
+          api.get("/dashboard/stats"),
+        ]);
+
+        setRepositories(repoResponse.data.repositories || []);
+        setSuggestedRepositories(suggestedResponse.data || []);
+
+        const starred = starredResponse.data.starredRepositories || [];
+        setStarredRepoIds(starred.map((repo) => String(repo._id)));
+
+        setStats(statsResponse.data);
       } catch (err) {
-        console.error("Error while fetching repositories:", err);
+        console.error("Error while loading dashboard:", err);
+        setError(
+          err.response?.data?.message ||
+            err.response?.data?.error ||
+            "Unable to load dashboard.",
+        );
+      } finally {
+        setLoading(false);
       }
     };
 
-    const fetchSuggestedRepositories = async () => {
-      try {
-        const response = await api.get("/repo/all");
-
-        setSuggestedRepositories(response.data);
-      } catch (err) {
-        console.error("Error while fetching repositories:", err);
-      }
-    };
-
-    const fetchStarredRepositories = async () => {
-      if (!userId) return;
-
-      try {
-        const response = await api.get(`/userProfile/${userId}/starred`);
-
-        const starredRepositories = response.data.starredRepositories || [];
-
-        setStarredRepoIds(starredRepositories.map((repo) => String(repo._id)));
-      } catch (err) {
-        console.error("Error while fetching starred repositories:", err);
-      }
-    };
-
-    fetchRepositories();
-    fetchSuggestedRepositories();
-    fetchStarredRepositories();
+    fetchDashboard();
   }, []);
 
   useEffect(() => {
-    if (searchQuery === "") {
-      setSearchResults(repositories);
-    } else {
-      const filteredRepo = repositories.filter((repo) =>
-        repo.name.toLowerCase().includes(searchQuery.toLowerCase()),
-      );
+    const query = searchQuery.trim();
 
-      setSearchResults(filteredRepo);
+    if (!query) {
+      setSearchResults([]);
+      setSearchError("");
+      return undefined;
     }
-  }, [searchQuery, repositories]);
+
+    const timeout = setTimeout(async () => {
+      try {
+        setSearchLoading(true);
+        setSearchError("");
+
+        const endpoint =
+          searchType === "repositories"
+            ? `/repo/search?q=${encodeURIComponent(query)}`
+            : `/users/search?q=${encodeURIComponent(query)}`;
+
+        const response = await api.get(endpoint);
+        setSearchResults(response.data || []);
+      } catch (err) {
+        console.error("Search failed:", err);
+        setSearchError(
+          err.response?.data?.message || "Search failed. Please try again.",
+        );
+        setSearchResults([]);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 280);
+
+    return () => clearTimeout(timeout);
+  }, [searchQuery, searchType]);
+
+  const handleStar = async (event, repoId) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const userId = localStorage.getItem("userId");
+
+    if (!userId || starLoadingId === repoId) return;
+
+    try {
+      setStarLoadingId(repoId);
+
+      const response = await api.patch(`/userProfile/${userId}/star/${repoId}`);
+
+      setStarredRepoIds((current) => {
+        if (response.data.starred) {
+          return current.includes(repoId) ? current : [...current, repoId];
+        }
+
+        return current.filter((id) => id !== repoId);
+      });
+
+      setStats((current) =>
+        current
+          ? {
+              ...current,
+              starredRepositories: Math.max(
+                0,
+                current.starredRepositories + (response.data.starred ? 1 : -1),
+              ),
+            }
+          : current,
+      );
+    } catch (err) {
+      console.error("Error while updating starred repository:", err);
+      setError(err.response?.data?.message || "Unable to update star status.");
+    } finally {
+      setStarLoadingId(null);
+    }
+  };
 
   return (
     <>
       <Navbar />
 
-      <section id="dashboard">
-        {/* Suggested Repositories */}
-        <aside className="dashboard-sidebar">
-          <h3>Suggested Repositories</h3>
+      <main className="dashboard-page">
+        {error && (
+          <div className="dashboard-alert-wrap">
+            <Alert type="error">{error}</Alert>
+          </div>
+        )}
 
-          <div className="repo-list">
-            {suggestedRepositories.map((repo) => {
-              const repoId = String(repo._id);
+        {loading ? (
+          <section className="dashboard-loading-state">
+            <div className="dashboard-skeleton-search" />
+            <div className="dashboard-skeleton-content" />
+          </section>
+        ) : (
+          <>
+            <section className="dashboard-search-panel">
+              <div className="dashboard-search-header">
+                <div>
+                  <h2>Search VCS</h2>
+                  <p>Find repositories or users across your workspace.</p>
+                </div>
 
-              const isStarred = starredRepoIds.includes(repoId);
-
-              const handleStar = async (event) => {
-                /*
-                  Prevent the click from doing anything
-                  to the repository link.
-                */
-                event.preventDefault();
-                event.stopPropagation();
-
-                const userId = localStorage.getItem("userId");
-
-                if (!userId || starLoadingId === repoId) {
-                  return;
-                }
-
-                try {
-                  setStarLoadingId(repoId);
-
-                  const response = await api.patch(
-                    `/userProfile/${userId}/star/${repoId}`,
-                  );
-
-                  setStarredRepoIds((current) => {
-                    if (response.data.starred) {
-                      return current.includes(repoId)
-                        ? current
-                        : [...current, repoId];
-                    }
-
-                    return current.filter((id) => id !== repoId);
-                  });
-                } catch (err) {
-                  console.error(
-                    "Error while updating starred repository:",
-                    err,
-                  );
-                } finally {
-                  setStarLoadingId(null);
-                }
-              };
-
-              return (
-                <div className="repo-card suggested-repo-card" key={repoId}>
-                  {/* Repository */}
-                  <Link to={`/repo/${repoId}`} className="repo-card-link">
-                    <h4>{repo.name}</h4>
-
-                    {repo.description && <p>{repo.description}</p>}
-                  </Link>
-
-                  {/* Star Button */}
+                <div className="dashboard-search-tabs">
                   <button
                     type="button"
-                    className={`repo-star-btn ${isStarred ? "starred" : ""}`}
-                    onClick={handleStar}
-                    disabled={starLoadingId === repoId}
-                    aria-label={
-                      isStarred ? `Unstar ${repo.name}` : `Star ${repo.name}`
-                    }
-                    title={isStarred ? "Unstar repository" : "Star repository"}
+                    className={searchType === "repositories" ? "active" : ""}
+                    onClick={() => {
+                      setSearchType("repositories");
+                      setSearchResults([]);
+                    }}
                   >
-                    {isStarred ? "★" : "☆"}
+                    Repositories
+                  </button>
+
+                  <button
+                    type="button"
+                    className={searchType === "users" ? "active" : ""}
+                    onClick={() => {
+                      setSearchType("users");
+                      setSearchResults([]);
+                    }}
+                  >
+                    Users
                   </button>
                 </div>
-              );
-            })}
-          </div>
-        </aside>
+              </div>
 
-        {/* Your Repositories */}
-        <main className="repositories-section">
-          <div className="repositories-header">
-            <h2>Your Repositories</h2>
-
-            <div id="search">
               <input
-                type="text"
+                className="dashboard-search-input"
+                type="search"
                 value={searchQuery}
-                placeholder="Search repositories..."
-                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={
+                  searchType === "repositories"
+                    ? "Search by repository name or description..."
+                    : "Search by username..."
+                }
+                onChange={(event) => setSearchQuery(event.target.value)}
               />
-            </div>
-          </div>
 
-          <div className="repo-list">
-            {searchResults.map((repo) => (
-              <Link
-                to={`/repo/${repo._id}`}
-                className="repo-card repo-card-link-wrapper"
-                key={repo._id}
-              >
-                <h4>{repo.name}</h4>
+              {searchQuery.trim() && (
+                <div className="dashboard-search-results">
+                  {searchLoading ? (
+                    <p className="dashboard-search-muted">Searching...</p>
+                  ) : searchError ? (
+                    <p className="dashboard-search-error">{searchError}</p>
+                  ) : searchResults.length === 0 ? (
+                    <p className="dashboard-search-muted">No results found.</p>
+                  ) : searchType === "repositories" ? (
+                    searchResults.map((repo) => (
+                      <Link
+                        to={`/repo/${repo._id}`}
+                        className="dashboard-search-result"
+                        key={repo._id}
+                      >
+                        <div>
+                          <strong>{repo.name}</strong>
+                          <span>{repo.description || "No description"}</span>
+                        </div>
 
-                {repo.description && <p>{repo.description}</p>}
-              </Link>
-            ))}
+                        <small>{repo.owner?.username || "Unknown owner"}</small>
+                      </Link>
+                    ))
+                  ) : (
+                    searchResults.map((user) => (
+                      <Link
+                        to={`/user/${user._id}`}
+                        className="dashboard-search-result"
+                        key={user._id}
+                      >
+                        <div>
+                          <strong>{user.username}</strong>
+                          <span>View profile</span>
+                        </div>
+                      </Link>
+                    ))
+                  )}
+                </div>
+              )}
+            </section>
 
-            {searchResults.length === 0 && (
-              <p className="no-results">No repositories found.</p>
-            )}
-          </div>
-        </main>
+            <section id="dashboard">
+              <aside className="dashboard-sidebar">
+                <div className="dashboard-section-title">
+                  <h3>Suggested Repositories</h3>
+                  <span>{suggestedRepositories.length}</span>
+                </div>
 
-        {/* Upcoming Events */}
-        <aside className="events-sidebar">
-          <h3>Upcoming Events</h3>
+                <div className="repo-list">
+                  {suggestedRepositories.slice(0, 8).map((repo) => {
+                    const repoId = String(repo._id);
+                    const isStarred = starredRepoIds.includes(repoId);
 
-          <ul>
-            <li>
-              <p>Tech Conference - Dec 15</p>
-            </li>
-            <li>
-              <p>Developer Meetup - Dec 25</p>
-            </li>
-            <li>
-              <p>React Summit - Jan 5</p>
-            </li>
-          </ul>
-        </aside>
-      </section>
+                    return (
+                      <div
+                        className="repo-card suggested-repo-card"
+                        key={repoId}
+                      >
+                        <Link to={`/repo/${repoId}`} className="repo-card-link">
+                          <h4>{repo.name}</h4>
+
+                          {repo.description && <p>{repo.description}</p>}
+
+                          <small>
+                            {repo.owner?.username || "Unknown owner"}
+                          </small>
+                        </Link>
+
+                        <button
+                          type="button"
+                          className={`repo-star-btn ${
+                            isStarred ? "starred" : ""
+                          }`}
+                          onClick={(event) => handleStar(event, repoId)}
+                          disabled={starLoadingId === repoId}
+                          aria-label={
+                            isStarred
+                              ? `Unstar ${repo.name}`
+                              : `Star ${repo.name}`
+                          }
+                        >
+                          {isStarred ? "★" : "☆"}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </aside>
+
+              <section className="repositories-section">
+                <div className="repositories-header">
+                  <div>
+                    <h2>Your Repositories</h2>
+                    <p>{repositories.length} repositories</p>
+                  </div>
+
+                  <Link to="/create" className="dashboard-inline-link">
+                    Create repository →
+                  </Link>
+                </div>
+
+                <div className="repo-list">
+                  {repositories.map((repo) => (
+                    <Link
+                      to={`/repo/${repo._id}`}
+                      className="repo-card repo-card-link-wrapper"
+                      key={repo._id}
+                    >
+                      <div className="dashboard-repo-title-row">
+                        <h4>{repo.name}</h4>
+
+                        <span
+                          className={
+                            repo.visibility
+                              ? "dashboard-visibility public"
+                              : "dashboard-visibility private"
+                          }
+                        >
+                          {repo.visibility ? "Public" : "Private"}
+                        </span>
+                      </div>
+
+                      {repo.description && <p>{repo.description}</p>}
+                    </Link>
+                  ))}
+
+                  {repositories.length === 0 && (
+                    <div className="dashboard-empty-state">
+                      <h3>No repositories yet</h3>
+
+                      <p>
+                        Create your first repository to start using the VCS.
+                      </p>
+
+                      <Link to="/create" className="dashboard-create-btn">
+                        Create repository
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              <aside className="events-sidebar">
+                <div className="dashboard-section-title">
+                  <h3>Workspace snapshot</h3>
+                </div>
+
+                <div className="dashboard-side-card">
+                  <span>Starred</span>
+                  <strong>{stats?.starredRepositories ?? 0}</strong>
+                  <small>Repositories you starred</small>
+                </div>
+
+                <div className="dashboard-side-card">
+                  <span>Followers</span>
+                  <strong>{stats?.followers ?? 0}</strong>
+                  <small>People following you</small>
+                </div>
+
+                <div className="dashboard-side-card">
+                  <span>Following</span>
+                  <strong>{stats?.following ?? 0}</strong>
+                  <small>People you follow</small>
+                </div>
+              </aside>
+            </section>
+          </>
+        )}
+      </main>
     </>
   );
 };

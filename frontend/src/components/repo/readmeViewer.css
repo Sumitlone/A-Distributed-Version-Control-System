@@ -1,0 +1,121 @@
+.readme-card {
+  margin-top: 24px;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  background: #161b22;
+  overflow: hidden;
+}
+
+.readme-heading {
+  padding: 17px 20px;
+  border-bottom: 1px solid #30363d;
+}
+
+.readme-heading h2 {
+  margin: 0;
+  color: #f0f6fc;
+  font-size: 17px;
+}
+
+.readme-heading p {
+  margin-top: 5px;
+  color: #8b949e;
+  font-size: 12px;
+}
+
+.readme-content {
+  padding: 24px;
+  color: #c9d1d9;
+  line-height: 1.7;
+}
+
+.readme-content h1,
+.readme-content h2,
+.readme-content h3,
+.readme-content h4,
+.readme-content h5,
+.readme-content h6 {
+  margin: 22px 0 10px;
+  color: #f0f6fc;
+  line-height: 1.3;
+}
+
+.readme-content h1 {
+  font-size: 26px;
+}
+
+.readme-content h2 {
+  font-size: 21px;
+}
+
+.readme-content h3 {
+  font-size: 18px;
+}
+
+.readme-content p {
+  margin: 10px 0;
+}
+
+.readme-content a {
+  color: #58a6ff;
+}
+
+.readme-content code {
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: #0d1117;
+  color: #79c0ff;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.9em;
+}
+
+.readme-content pre {
+  margin: 16px 0;
+  padding: 15px;
+  overflow: auto;
+  border: 1px solid #30363d;
+  border-radius: 7px;
+  background: #0d1117;
+}
+
+.readme-content pre code {
+  padding: 0;
+  background: transparent;
+  color: #c9d1d9;
+}
+
+.readme-content ul {
+  padding-left: 22px;
+}
+
+.readme-content li {
+  margin: 5px 0;
+}
+
+.readme-empty,
+.readme-error {
+  padding: 22px;
+  color: #8b949e;
+  font-size: 13px;
+}
+
+.readme-error {
+  color: #ff7b72;
+}
+
+.readme-skeleton {
+  height: 220px;
+  background: #21262d;
+  animation: readmePulse 1.2s infinite ease-in-out;
+}
+
+@keyframes readmePulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}

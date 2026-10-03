@@ -83,7 +83,7 @@ yargs(hideBin(process.argv))
 
 function startServer() {
   const app = express();
-  const port = process.env.PORT || 3000;
+  const port = process.env.PORT || 3002;
 
   app.use(bodyParser.json());
   app.use(express.json());
@@ -94,7 +94,27 @@ function startServer() {
     .then(() => console.log("MongoDB conection successful"))
     .catch((err) => console.error("Unable to connect:", err));
 
-  app.use(cors({ origin: "*" }));
+  const allowedOrigins = (process.env.CLIENT_URL || "http://localhost:5173")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  app.use(
+    cors({
+      origin(origin, callback) {
+        if (
+          !origin ||
+          allowedOrigins.includes("*") ||
+          allowedOrigins.includes(origin)
+        ) {
+          return callback(null, true);
+        }
+
+        return callback(new Error("CORS origin not allowed."));
+      },
+      credentials: true,
+    }),
+  );
 
   app.use("/", mainRouter);
 

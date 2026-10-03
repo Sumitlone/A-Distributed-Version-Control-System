@@ -6,14 +6,22 @@ import api from "../../api/apiClient";
 import Navbar from "../Navbar";
 import "./vcs.css";
 
+const shortCommitId = (commitId) =>
+  commitId ? commitId.slice(0, 8) : "unknown";
+
 const CommitHistory = () => {
   const { id } = useParams();
 
   const navigate = useNavigate();
 
   const [repository, setRepository] = useState(null);
+
   const [commits, setCommits] = useState([]);
+
+  const [remoteHead, setRemoteHead] = useState(null);
+
   const [loading, setLoading] = useState(true);
+
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -31,6 +39,8 @@ const CommitHistory = () => {
         setRepository(repoResponse.data.repository || repoResponse.data);
 
         setCommits(historyResponse.data.commits || []);
+
+        setRemoteHead(historyResponse.data.remoteHead || null);
       } catch (err) {
         console.error("Cannot fetch commit history:", err);
 
@@ -118,6 +128,12 @@ const CommitHistory = () => {
               {commits.length} commit
               {commits.length !== 1 ? "s" : ""} in {repository.name}.
             </p>
+
+            {remoteHead && (
+              <p className="vcs-head-label">
+                Remote HEAD: {shortCommitId(remoteHead)}
+              </p>
+            )}
           </div>
 
           <Link to={`/repo/${id}/vcs`} className="vcs-secondary-btn">
@@ -134,13 +150,28 @@ const CommitHistory = () => {
                 className="commit-history-item"
               >
                 <div className="commit-history-main">
-                  <h2>{commit.message || "No commit message"}</h2>
+                  <div className="commit-history-title-row">
+                    <h2>{commit.message || "No commit message"}</h2>
+
+                    <span
+                      className={
+                        commit.pushed
+                          ? "vcs-commit-badge pushed"
+                          : "vcs-commit-badge local"
+                      }
+                    >
+                      {commit.pushed ? "Remote" : "Unpushed"}
+                    </span>
+                  </div>
 
                   <p>{commit.commitId}</p>
 
                   <span>
                     {commit.fileCount} file
                     {commit.fileCount !== 1 ? "s" : ""}
+                    {commit.parent && (
+                      <> · parent {shortCommitId(commit.parent)}</>
+                    )}
                   </span>
                 </div>
 

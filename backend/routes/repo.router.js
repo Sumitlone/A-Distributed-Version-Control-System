@@ -14,6 +14,7 @@ repoRouter.use(authMiddleware);
 
 repoRouter.post("/repo/create", repoController.createRepository);
 repoRouter.get("/repo/all", repoController.getAllRepositories);
+repoRouter.get("/repo/search", repoController.searchRepositories);
 repoRouter.get("/repo/name/:name", repoController.fetchRepositoryByName);
 repoRouter.get(
   "/repo/user/:userID",

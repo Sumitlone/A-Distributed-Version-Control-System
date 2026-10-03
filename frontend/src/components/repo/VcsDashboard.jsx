@@ -1,8 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+
+import { Link, useParams } from "react-router-dom";
+
 import api from "../../api/apiClient";
 import Navbar from "../Navbar";
 import "./vcs.css";
+import VcsFileTree from "./VcsFileTree";
+import CodeEditor from "./CodeEditor";
+
 import { useConfirm } from "../common/ConfirmContext";
 
 const createFileName = (files) => {
@@ -18,11 +23,12 @@ const createFileName = (files) => {
   return name;
 };
 
+const shortCommitId = (commitId) => (commitId ? commitId.slice(0, 8) : "none");
+
 const VcsDashboard = () => {
   const { confirm } = useConfirm();
-  const { id } = useParams();
 
-  const navigate = useNavigate();
+  const { id } = useParams();
 
   const userId = localStorage.getItem("userId");
 
@@ -44,6 +50,8 @@ const VcsDashboard = () => {
 
   const [actionLoading, setActionLoading] = useState(false);
 
+  const [status, setStatus] = useState(null);
+
   const ownerId = useMemo(() => {
     if (!repository?.owner) {
       return null;
@@ -58,10 +66,25 @@ const VcsDashboard = () => {
 
   const selectedFile = files[selectedIndex] || null;
 
+  const fetchStatus = async () => {
+    if (!isOwner) {
+      return;
+    }
+
+    try {
+      const response = await api.get(`/vcs/${id}/status`);
+
+      setStatus(response.data);
+    } catch (err) {
+      console.error("Cannot fetch VCS status:", err);
+    }
+  };
+
   const fetchWorkspace = async () => {
     if (!isOwner) {
       setFiles([]);
       setWorkspaceLoading(false);
+
       return;
     }
 
@@ -116,9 +139,12 @@ const VcsDashboard = () => {
   }, [id]);
 
   useEffect(() => {
-    if (repository) {
-      fetchWorkspace();
+    if (!repository) {
+      return;
     }
+
+    fetchWorkspace();
+    fetchStatus();
   }, [repository, isOwner, id]);
 
   const updateFile = (field, value) => {
@@ -137,7 +163,6 @@ const VcsDashboard = () => {
   const handleAddFile = () => {
     const newFile = {
       name: createFileName(files),
-
       content: "",
     };
 
@@ -190,11 +215,13 @@ const VcsDashboard = () => {
 
     if (!message.trim()) {
       setError("Commit message is required.");
+
       return;
     }
 
     if (files.length === 0) {
       setError("Add at least one file before committing.");
+
       return;
     }
 
@@ -202,21 +229,22 @@ const VcsDashboard = () => {
 
     if (names.some((name) => !name)) {
       setError("Every file must have a name.");
+
       return;
     }
 
     if (new Set(names).size !== names.length) {
       setError("File names must be unique.");
+
       return;
     }
 
     try {
       setActionLoading(true);
-
       setError("");
       setNotice("");
 
-      const response = await api.post(`/vcs/${id}/commit`, {
+      const response = await api.post(`/vcs/${id}/commits`, {
         message: message.trim(),
 
         files: files.map((file) => ({
@@ -230,8 +258,12 @@ const VcsDashboard = () => {
       setMessage("");
 
       setNotice(
-        `Commit ${commit?.commitId?.slice(0, 8) || ""} created successfully.`,
+        `Commit ${shortCommitId(
+          commit?.commitId,
+        )} created locally. Push it to synchronize with S3.`,
       );
+
+      await fetchStatus();
     } catch (err) {
       console.error("Cannot create commit:", err);
 
@@ -248,15 +280,24 @@ const VcsDashboard = () => {
 
     try {
       setActionLoading(true);
-
       setError("");
       setNotice("");
 
       const response = await api.post(`/vcs/${id}/push`, {});
 
+      const pushedCount = response.data.pushedCommitCount ?? 0;
+
       setNotice(
-        `${response.data.message || "Repository pushed successfully."} Bucket: ${response.data.bucket || "unknown"} | Prefix: ${response.data.prefix || "unknown"}`,
+        pushedCount > 0
+          ? `${pushedCount} commit${
+              pushedCount === 1 ? "" : "s"
+            } pushed to S3 successfully. Remote HEAD: ${shortCommitId(
+              response.data.remoteHead,
+            )}.`
+          : "S3 is already up to date.",
       );
+
+      await fetchStatus();
     } catch (err) {
       console.error("Cannot push repository:", err);
 
@@ -278,7 +319,7 @@ const VcsDashboard = () => {
         title: "Pull from S3",
 
         message:
-          "Pulling from S3 will replace the current workspace with the latest remote commit. Continue?",
+          "Pulling from S3 will replace the current workspace with the remote HEAD. Continue?",
 
         confirmText: "Pull changes",
 
@@ -294,17 +335,21 @@ const VcsDashboard = () => {
 
     try {
       setActionLoading(true);
-
       setError("");
       setNotice("");
 
       const response = await api.post(`/vcs/${id}/pull`, {});
 
+      const downloadedCount = response.data.downloadedCommitCount ?? 0;
+
       setNotice(
-        response.data.message || "Repository pulled from S3 successfully.",
+        `Pull completed. ${downloadedCount} new commit${
+          downloadedCount === 1 ? "" : "s"
+        } downloaded. Remote HEAD: ${shortCommitId(response.data.remoteHead)}.`,
       );
 
       await fetchWorkspace();
+      await fetchStatus();
     } catch (err) {
       console.error("Cannot pull repository:", err);
 
@@ -362,8 +407,8 @@ const VcsDashboard = () => {
             <h1>{repository.name} — Version Control</h1>
 
             <p>
-              Create commits locally and synchronize them with your AWS S3
-              remote.
+              Work locally, commit snapshots, and synchronize the repository
+              with its S3 remote.
             </p>
           </div>
 
@@ -383,11 +428,55 @@ const VcsDashboard = () => {
 
         {error && <div className="vcs-error">{error}</div>}
 
+        {isOwner && status && (
+          <section className="vcs-status-card">
+            <div className="vcs-status-item">
+              <span>Local HEAD</span>
+
+              <strong>{shortCommitId(status.localHead)}</strong>
+            </div>
+
+            <div className="vcs-status-item">
+              <span>Remote HEAD</span>
+
+              <strong>{shortCommitId(status.remoteHead)}</strong>
+            </div>
+
+            <div className="vcs-status-item">
+              <span>Sync state</span>
+
+              <strong
+                className={
+                  status.synchronized
+                    ? "vcs-sync-good"
+                    : status.ahead > 0 && status.behind > 0
+                      ? "vcs-sync-conflict"
+                      : "vcs-sync-pending"
+                }
+              >
+                {status.synchronized
+                  ? "Up to date"
+                  : status.ahead > 0 && status.behind > 0
+                    ? "Diverged"
+                    : status.ahead > 0
+                      ? `${status.ahead} unpushed`
+                      : `${status.behind} behind`}
+              </strong>
+            </div>
+
+            <div className="vcs-status-item">
+              <span>Remote commits</span>
+
+              <strong>{status.remoteCommitCount}</strong>
+            </div>
+          </section>
+        )}
+
         <section className="vcs-toolbar">
           <div className="vcs-toolbar-info">
             <strong>Remote</strong>
 
-            <span>AWS S3 repository storage</span>
+            <span>AWS S3 · repositories/{id}/commits/</span>
           </div>
 
           <div className="vcs-toolbar-actions">
@@ -416,7 +505,10 @@ const VcsDashboard = () => {
             <div>
               <h2>Commit changes</h2>
 
-              <p>Edit your workspace files and create a new snapshot commit.</p>
+              <p>
+                Edit workspace files and create a new snapshot commit. Every
+                commit records its parent so the history remains connected.
+              </p>
             </div>
 
             <button
@@ -440,28 +532,19 @@ const VcsDashboard = () => {
                   <span>{files.length}</span>
                 </div>
 
-                {files.length > 0 ? (
-                  <div className="vcs-file-list">
-                    {files.map((file, index) => (
-                      <button
-                        type="button"
-                        key={`${file.name}-${index}`}
-                        className={
-                          selectedIndex === index
-                            ? "vcs-file-item active"
-                            : "vcs-file-item"
-                        }
-                        onClick={() => setSelectedIndex(index)}
-                      >
-                        {file.name}
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="vcs-empty-file-list">
-                    No files yet. Add a file to start.
-                  </p>
-                )}
+                <VcsFileTree
+                  files={files}
+                  selectedPath={selectedFile?.name || ""}
+                  onSelect={(filePath) => {
+                    const index = files.findIndex(
+                      (file) => file.name === filePath,
+                    );
+
+                    if (index >= 0) {
+                      setSelectedIndex(index);
+                    }
+                  }}
+                />
               </aside>
 
               <div className="vcs-editor-panel">
@@ -488,15 +571,11 @@ const VcsDashboard = () => {
                       </button>
                     </div>
 
-                    <textarea
-                      className="vcs-code-editor"
+                    <CodeEditor
+                      fileName={selectedFile.name}
                       value={selectedFile.content}
-                      onChange={(event) =>
-                        updateFile("content", event.target.value)
-                      }
+                      onChange={(value) => updateFile("content", value)}
                       disabled={!isOwner || actionLoading}
-                      spellCheck="false"
-                      placeholder="Write file content here..."
                     />
                   </>
                 ) : (

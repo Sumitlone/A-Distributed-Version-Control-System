@@ -137,6 +137,33 @@ async function login(req, res) {
   }
 }
 
+// Search users
+async function searchUsers(req, res) {
+  const q = String(req.query.q || "").trim();
+
+  try {
+    if (!q) {
+      return res.json([]);
+    }
+
+    const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+
+    const users = await User.find({
+      username: regex,
+    })
+      .select("_id username")
+      .limit(25);
+
+    res.json(users);
+  } catch (error) {
+    console.error("Error during user search:", error.message);
+
+    res.status(500).json({
+      message: "Server error!",
+    });
+  }
+}
+
 // Get all users
 async function getAllUsers(req, res) {
   try {
@@ -608,6 +635,7 @@ async function getFollowing(req, res) {
 
 module.exports = {
   getAllUsers,
+  searchUsers,
   signup,
   login,
   getUserProfile,

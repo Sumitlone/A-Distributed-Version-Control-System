@@ -3,6 +3,7 @@ const userRouter = require("./user.router");
 const repoRouter = require("./repo.router");
 const issueRouter = require("./issue.router");
 const vcsRouter = require("./vcs.router");
+const dashboardRouter = require("./dashboard.router");
 
 const mainRouter = express.Router();
 
@@ -10,6 +11,7 @@ mainRouter.use(userRouter);
 mainRouter.use(repoRouter);
 mainRouter.use(issueRouter);
 mainRouter.use(vcsRouter);
+mainRouter.use(dashboardRouter);
 
 // mainRouter.get("/", (req, res) => {
 //   res.send("Welcome");
