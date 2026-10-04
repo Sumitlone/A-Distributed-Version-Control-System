@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import api from "../../api/apiClient";
 import { useAuth } from "../../authContext";
 import Alert from "../common/Alert";
@@ -20,17 +20,13 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
-  const [error, setError] = useState("");
-
-  useEffect(() => {
+  const [error, setError] = useState(() => {
     const authMessage = sessionStorage.getItem("authMessage");
-
     if (authMessage) {
-      setError(authMessage);
-
       sessionStorage.removeItem("authMessage");
     }
-  }, []);
+    return authMessage || "";
+  });
 
   const handleLogin = async (e) => {
     e.preventDefault();

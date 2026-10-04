@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import "./codeEditor.css";
 
 const extensionLanguage = (name) => {
@@ -23,10 +23,6 @@ const CodeEditor = ({ fileName, value, onChange, disabled }) => {
 
   const lineNumbersRef = useRef(null);
   const textareaRef = useRef(null);
-
-  useEffect(() => {
-    setLanguage(extensionLanguage(fileName || ""));
-  }, [fileName]);
 
   const lineCount = useMemo(
     () => Math.max(1, String(value || "").split("\n").length),

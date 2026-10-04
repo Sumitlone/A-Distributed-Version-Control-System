@@ -57,12 +57,9 @@ const CreateRepository = () => {
       setError("");
 
       const response = await api.post(`/repo/create`, {
-        owner: userId,
         name,
         description,
         visibility: formData.visibility,
-        content: [],
-        issues: [],
       });
 
       const repositoryId = response.data.repositoryID;

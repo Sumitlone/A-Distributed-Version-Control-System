@@ -22,50 +22,65 @@ const IssueDetails = () => {
   const [editLoading, setEditLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
-  const fetchIssue = async () => {
-    try {
-      setLoading(true);
-      setError("");
-
-      const response = await api.get(`/issue/${issueId}`);
-
-      const fetchedIssue = response.data.issue || response.data;
-
-      setIssue(fetchedIssue);
-
-      setEditTitle(fetchedIssue.title || "");
-
-      setEditDescription(fetchedIssue.description || "");
-
-      setEditStatus(fetchedIssue.status || "open");
-
-      if (
-        fetchedIssue.repository &&
-        typeof fetchedIssue.repository === "object"
-      ) {
-        setRepository(fetchedIssue.repository);
-      } else if (repositoryId) {
-        const repositoryResponse = await api.get(`/repo/${repositoryId}`);
-
-        setRepository(
-          repositoryResponse.data.repository || repositoryResponse.data,
-        );
-      }
-    } catch (err) {
-      console.error("Cannot fetch issue:", err);
-
-      setError(
-        err.response?.data?.error ||
-          err.response?.data?.message ||
-          "Unable to load issue.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchIssue();
+    let cancelled = false;
+
+    const loadIssue = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const response = await api.get(`/issue/${issueId}`);
+
+        const fetchedIssue = response.data.issue || response.data;
+
+        if (cancelled) {
+          return;
+        }
+
+        setIssue(fetchedIssue);
+        setEditTitle(fetchedIssue.title || "");
+        setEditDescription(fetchedIssue.description || "");
+        setEditStatus(fetchedIssue.status || "open");
+
+        if (
+          fetchedIssue.repository &&
+          typeof fetchedIssue.repository === "object"
+        ) {
+          setRepository(fetchedIssue.repository);
+        } else if (repositoryId) {
+          const repositoryResponse = await api.get(`/repo/${repositoryId}`);
+
+          if (cancelled) {
+            return;
+          }
+
+          setRepository(
+            repositoryResponse.data.repository || repositoryResponse.data,
+          );
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error("Cannot fetch issue:", err);
+
+          setError(
+            err.response?.data?.error ||
+              err.response?.data?.message ||
+              "Unable to load issue.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadIssue();
+
+    return () => {
+      cancelled = true;
+    };
   }, [issueId, repositoryId]);
 
   const formatDate = (date) => {

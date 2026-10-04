@@ -22,6 +22,8 @@ const CommitDetails = () => {
 
   const [commit, setCommit] = useState(null);
 
+  const [isOwner, setIsOwner] = useState(false);
+
   const [loading, setLoading] = useState(true);
 
   const [actionLoading, setActionLoading] = useState(false);
@@ -44,9 +46,23 @@ const CommitDetails = () => {
           api.get(`/vcs/${id}/commits/${commitId}`),
         ]);
 
-        setRepository(repoResponse.data.repository || repoResponse.data);
+        const repo = repoResponse.data.repository || repoResponse.data;
 
+        setRepository(repo);
         setCommit(commitResponse.data.commit);
+
+        const currentUserId = localStorage.getItem("userId");
+
+        const ownerId =
+          typeof repo.owner === "object" ? repo.owner?._id : repo.owner;
+
+        setIsOwner(
+          Boolean(
+            currentUserId &&
+            ownerId &&
+            String(currentUserId) === String(ownerId),
+          ),
+        );
       } catch (err) {
         console.error("Cannot fetch commit:", err);
 
@@ -204,14 +220,16 @@ const CommitDetails = () => {
               <time>{formatDate(commit.date)}</time>
             </div>
 
-            <button
-              type="button"
-              className="vcs-danger-btn"
-              onClick={handleRevert}
-              disabled={actionLoading}
-            >
-              {actionLoading ? "Creating revert..." : "Create revert commit"}
-            </button>
+            {isOwner && (
+              <button
+                type="button"
+                className="vcs-danger-btn"
+                onClick={handleRevert}
+                disabled={actionLoading}
+              >
+                {actionLoading ? "Creating revert..." : "Create revert commit"}
+              </button>
+            )}
           </div>
 
           {notice && (

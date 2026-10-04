@@ -1,6 +1,10 @@
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const User = require("../models/userModel");
+const {
+  authenticateUser,
+  createAuthToken,
+} = require("../services/authService");
 const dotenv = require("dotenv");
 const Repository = require("../models/repoModel");
 const Issue = require("../models/issueModel");
@@ -107,25 +111,9 @@ async function login(req, res) {
   const { email, password } = req.body;
 
   try {
-    const user = await User.findOne({ email });
+    const user = await authenticateUser(email, password);
 
-    if (!user) {
-      return res.status(400).json({
-        message: "Invalid credentials!",
-      });
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-
-    if (!isMatch) {
-      return res.status(400).json({
-        message: "Invalid credentials!",
-      });
-    }
-
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET_KEY, {
-      expiresIn: "168h",
-    });
+    const token = createAuthToken(user._id);
 
     res.json({
       token,
@@ -133,7 +121,10 @@ async function login(req, res) {
     });
   } catch (error) {
     console.error("Error during login:", error.message);
-    res.status(500).send("Server error!");
+
+    res.status(error.status || 500).json({
+      message: error.message || "Server error!",
+    });
   }
 }
 
@@ -402,12 +393,6 @@ async function deleteUserProfile(req, res) {
         repositories/<repoId>/...
       */
       await deleteS3Prefix(`repositories/${repoId}/`);
-
-      /*
-        Older web VCS structure:
-        commits/<repoId>/...
-      */
-      await deleteS3Prefix(`commits/${repoId}/`);
 
       /*
         Remove local server-side

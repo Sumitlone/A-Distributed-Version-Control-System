@@ -17,69 +17,101 @@ const { pushRepo } = require("./controllers/push");
 const { pullRepo } = require("./controllers/pull");
 const { revertRepo } = require("./controllers/revert");
 
+const { loginCli, logoutCli, whoamiCli } = require("./controllers/cliAuth");
+const {
+  connectCliDatabase,
+  disconnectCliDatabase,
+} = require("./utils/cliDatabase");
+
 dotenv.config();
+
+async function runCliDatabaseCommand(handler, ...args) {
+  await connectCliDatabase();
+
+  try {
+    await handler(...args);
+  } finally {
+    await disconnectCliDatabase();
+  }
+}
 
 yargs(hideBin(process.argv))
   .command("start", "Starts a new server", {}, startServer)
+  .command("login", "Login to the VCS CLI", {}, async () => {
+    await runCliDatabaseCommand(loginCli);
+  })
+  .command("logout", "Logout from the VCS CLI", {}, async () => {
+    await logoutCli();
+  })
+  .command("whoami", "Show the current VCS CLI user", {}, async () => {
+    await runCliDatabaseCommand(whoamiCli);
+  })
   .command(
-    "init", //command name
-    "Initialize a new repository", //description
-    {}, //arguments
-    initRepo, //controller
-  )
-  .command(
-    "add <file>", //command name
-    "Add a file to the repository", //description
-    (yargs) => {
-      yargs.positional("file", {
-        describe: "File to add to the staging area",
+    "init <repoName>",
+    "Select and initialize a repository using its name",
+    (command) => {
+      command.positional("repoName", {
+        describe: "MongoDB repository name",
         type: "string",
       });
-    }, //arguments
-    (argv) => {
-      addRepo(argv.file);
-    }, //controller
+    },
+    async (argv) => {
+      await runCliDatabaseCommand(initRepo, argv.repoName);
+    },
   )
   .command(
-    "commit <message>", //command name
-    "Commit the Staged files", //description
-    (yargs) => {
-      yargs.positional("message", {
-        describe: "Commit Message",
+    "add <file>",
+    "Stage a file or directory in the selected repository",
+    (command) => {
+      command.positional("file", {
+        describe: "File or directory to stage",
         type: "string",
       });
-    }, //arguments
-    (argv) => {
-      commitRepo(argv.message);
-    }, //controller
+    },
+    async (argv) => {
+      await runCliDatabaseCommand(addRepo, argv.file);
+    },
   )
   .command(
-    "push", //command name
-    "Push commits to S3", //description
-    {}, //arguments
-    pushRepo, //controller
-  )
-  .command(
-    "pull", //command name
-    "Pull commits from S3", //description
-    {}, //arguments
-    pullRepo, //controller
-  )
-  .command(
-    "revert <commitID>", //command name
-    "Revert to a specific commit", //description
-    (yargs) => {
-      yargs.positional("commitID", {
-        describe: "Comit ID to revert to",
+    "commit <message>",
+    "Create a commit from staged files",
+    (command) => {
+      command.positional("message", {
+        describe: "Commit message",
         type: "string",
       });
-    }, //arguments
-    (argv) => {
-      revertRepo(argv.commitID);
-    }, //controller
+    },
+    async (argv) => {
+      await runCliDatabaseCommand(commitRepo, argv.message);
+    },
+  )
+  .command("push", "Push selected repository commits to S3", {}, async () => {
+    await runCliDatabaseCommand(pushRepo);
+  })
+  .command("pull", "Pull selected repository commits from S3", {}, async () => {
+    await runCliDatabaseCommand(pullRepo);
+  })
+  .command(
+    "revert <commitID>",
+    "Create a new revert commit",
+    (command) => {
+      command.positional("commitID", {
+        describe: "Commit ID to revert",
+        type: "string",
+      });
+    },
+    async (argv) => {
+      await runCliDatabaseCommand(revertRepo, argv.commitID);
+    },
   )
   .demandCommand(1, "You need at least one command")
-  .help().argv;
+  .help()
+  .strict()
+  .parseAsync()
+  .catch((error) => {
+    console.error(error.message || error);
+    process.exitCode = 1;
+  });
 
 function startServer() {
   const app = express();

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Link, useParams } from "react-router-dom";
 
@@ -50,6 +50,8 @@ const VcsDashboard = () => {
 
   const [actionLoading, setActionLoading] = useState(false);
 
+  const [stagedCount, setStagedCount] = useState(0);
+
   const [status, setStatus] = useState(null);
 
   const ownerId = useMemo(() => {
@@ -66,21 +68,44 @@ const VcsDashboard = () => {
 
   const selectedFile = files[selectedIndex] || null;
 
-  const fetchStatus = async () => {
+  const requestStatus = useCallback(async () => {
+    if (!isOwner) {
+      return null;
+    }
+
+    const response = await api.get(`/vcs/${id}/status`);
+
+    return response.data;
+  }, [id, isOwner]);
+
+  const requestWorkspace = useCallback(async () => {
+    if (!isOwner) {
+      return [];
+    }
+
+    const response = await api.get(`/vcs/${id}/workspace`);
+
+    return response.data.files || [];
+  }, [id, isOwner]);
+
+  const fetchStatus = useCallback(async () => {
     if (!isOwner) {
       return;
     }
 
     try {
-      const response = await api.get(`/vcs/${id}/status`);
+      const data = await requestStatus();
 
-      setStatus(response.data);
+      if (data) {
+        setStatus(data);
+        setStagedCount(data.stagedFileCount ?? 0);
+      }
     } catch (err) {
       console.error("Cannot fetch VCS status:", err);
     }
-  };
+  }, [isOwner, requestStatus]);
 
-  const fetchWorkspace = async () => {
+  const fetchWorkspace = useCallback(async () => {
     if (!isOwner) {
       setFiles([]);
       setWorkspaceLoading(false);
@@ -91,9 +116,7 @@ const VcsDashboard = () => {
     try {
       setWorkspaceLoading(true);
 
-      const response = await api.get(`/vcs/${id}/workspace`);
-
-      const workspaceFiles = response.data.files || [];
+      const workspaceFiles = await requestWorkspace();
 
       setFiles(workspaceFiles);
 
@@ -111,41 +134,70 @@ const VcsDashboard = () => {
     } finally {
       setWorkspaceLoading(false);
     }
-  };
-
-  useEffect(() => {
-    const fetchRepository = async () => {
-      try {
-        setLoading(true);
-        setError("");
-
-        const response = await api.get(`/repo/${id}`);
-
-        setRepository(response.data.repository || response.data);
-      } catch (err) {
-        console.error("Cannot fetch repository:", err);
-
-        setError(
-          err.response?.data?.error ||
-            err.response?.data?.message ||
-            "Unable to load repository.",
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchRepository();
-  }, [id]);
+  }, [isOwner, requestWorkspace]);
 
   useEffect(() => {
     if (!repository) {
       return;
     }
 
-    fetchWorkspace();
-    fetchStatus();
-  }, [repository, isOwner, id]);
+    let cancelled = false;
+
+    const loadVcsData = async () => {
+      if (!isOwner) {
+        if (!cancelled) {
+          setFiles([]);
+          setStatus(null);
+          setStagedCount(0);
+          setWorkspaceLoading(false);
+        }
+
+        return;
+      }
+
+      try {
+        setWorkspaceLoading(true);
+
+        const [workspaceFiles, statusData] = await Promise.all([
+          requestWorkspace(),
+          requestStatus(),
+        ]);
+
+        if (cancelled) {
+          return;
+        }
+
+        setFiles(workspaceFiles);
+
+        setSelectedIndex((current) =>
+          workspaceFiles.length === 0
+            ? 0
+            : Math.min(current, workspaceFiles.length - 1),
+        );
+
+        setStatus(statusData);
+        setStagedCount(statusData?.stagedFileCount ?? 0);
+      } catch (err) {
+        if (!cancelled) {
+          console.error("Cannot load VCS data:", err);
+
+          setError(
+            err.response?.data?.message || "Unable to load VCS workspace.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setWorkspaceLoading(false);
+        }
+      }
+    };
+
+    void loadVcsData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [repository, isOwner, requestWorkspace, requestStatus]);
 
   const updateFile = (field, value) => {
     setFiles((current) =>
@@ -158,6 +210,8 @@ const VcsDashboard = () => {
           : file,
       ),
     );
+
+    setStagedCount(0);
   };
 
   const handleAddFile = () => {
@@ -169,6 +223,7 @@ const VcsDashboard = () => {
     setFiles((current) => [...current, newFile]);
 
     setSelectedIndex(files.length);
+    setStagedCount(0);
 
     setNotice("");
     setError("");
@@ -198,12 +253,63 @@ const VcsDashboard = () => {
     const nextFiles = files.filter((_, index) => index !== selectedIndex);
 
     setFiles(nextFiles);
+    setStagedCount(0);
 
     setSelectedIndex((current) =>
       nextFiles.length === 0
         ? 0
         : Math.max(0, Math.min(current - 1, nextFiles.length - 1)),
     );
+  };
+
+  const handleStage = async () => {
+    if (!isOwner) {
+      return;
+    }
+
+    if (files.length === 0) {
+      setError("Add at least one file before staging.");
+      return;
+    }
+
+    const names = files.map((file) => file.name.trim());
+
+    if (names.some((name) => !name)) {
+      setError("Every file must have a name before staging.");
+      return;
+    }
+
+    if (new Set(names).size !== names.length) {
+      setError("File names must be unique.");
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      setError("");
+      setNotice("");
+
+      const response = await api.post(`/vcs/${id}/add`, {
+        files: files.map((file) => ({
+          name: file.name.trim(),
+          content: file.content,
+        })),
+      });
+
+      const count = response.data.fileCount ?? files.length;
+
+      setStagedCount(count);
+
+      setNotice(
+        `${count} file${count === 1 ? "" : "s"} staged successfully. Create a commit when ready.`,
+      );
+    } catch (err) {
+      console.error("Cannot stage files:", err);
+
+      setError(err.response?.data?.message || "Unable to stage files.");
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const handleCommit = async (event) => {
@@ -221,6 +327,12 @@ const VcsDashboard = () => {
 
     if (files.length === 0) {
       setError("Add at least one file before committing.");
+
+      return;
+    }
+
+    if (stagedCount === 0) {
+      setError("Stage your files before committing.");
 
       return;
     }
@@ -246,15 +358,11 @@ const VcsDashboard = () => {
 
       const response = await api.post(`/vcs/${id}/commits`, {
         message: message.trim(),
-
-        files: files.map((file) => ({
-          name: file.name.trim(),
-          content: file.content,
-        })),
       });
 
       const commit = response.data.commit;
 
+      setStagedCount(0);
       setMessage("");
 
       setNotice(
@@ -469,6 +577,11 @@ const VcsDashboard = () => {
 
               <strong>{status.remoteCommitCount}</strong>
             </div>
+
+            <div className="vcs-status-item">
+              <span>Staged files</span>
+              <strong>{status.stagedFileCount ?? 0}</strong>
+            </div>
           </section>
         )}
 
@@ -511,14 +624,25 @@ const VcsDashboard = () => {
               </p>
             </div>
 
-            <button
-              type="button"
-              className="vcs-secondary-btn"
-              onClick={handleAddFile}
-              disabled={!isOwner || actionLoading}
-            >
-              + Add file
-            </button>
+            <div className="vcs-toolbar-actions">
+              <button
+                type="button"
+                className="vcs-secondary-btn"
+                onClick={handleAddFile}
+                disabled={!isOwner || actionLoading}
+              >
+                + New file
+              </button>
+
+              <button
+                type="button"
+                className="vcs-secondary-btn"
+                onClick={handleStage}
+                disabled={!isOwner || actionLoading || files.length === 0}
+              >
+                {stagedCount > 0 ? `${stagedCount} staged` : "Stage files"}
+              </button>
+            </div>
           </div>
 
           {workspaceLoading ? (
@@ -572,6 +696,7 @@ const VcsDashboard = () => {
                     </div>
 
                     <CodeEditor
+                      key={selectedFile.name}
                       fileName={selectedFile.name}
                       value={selectedFile.content}
                       onChange={(value) => updateFile("content", value)}

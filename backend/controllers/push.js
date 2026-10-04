@@ -1,33 +1,15 @@
-const fs = require("fs").promises;
-const path = require("path");
-const{s3, S3_BUCKET} = require("../config/aws-config");
+const vcsService = require("../services/vcsService");
+const { loadCliContext } = require("../utils/cliVcsContext");
 
 async function pushRepo() {
-  const repoPath = path.resolve(process.cwd(), ".initFold");
-  const commitsPath = path.join(repoPath, "commits");
+  const { repositoryId, userId } = await loadCliContext();
 
-  try{
-    const commitDirs = await fs.readdir(commitsPath);
-    for(const commitDir of commitDirs){
-      const commitPath = path.join(commitsPath, commitDir);
-      const files = await fs.readdir(commitPath);
+  const result = await vcsService.pushRepository(repositoryId, userId);
 
-      for(const file of files){
-        const filePath = path.join(commitPath, file);
-        const fileContent = await fs.readFile(filePath);
-        const params = {
-          Bucket: S3_BUCKET,
-          Key: `commits/${commitDir}/${file}`,
-          Body: fileContent,
-        };
-        await s3.upload(params).promise();
-      }
-
-      console.log("All commits pushed to S3");
-    }
-  }catch(err){
-    console.error("Error pushing to S3 : ",err);
-  }
+  console.log(result.message);
+  console.log(`Pushed commits: ${result.pushedCommitCount}`);
+  console.log(`Uploaded files: ${result.uploadedFiles}`);
+  console.log(`Remote HEAD: ${result.remoteHead}`);
 }
 
 module.exports = { pushRepo };

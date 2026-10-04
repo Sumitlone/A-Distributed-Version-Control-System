@@ -1,34 +1,18 @@
-const fs = require("fs").promises;
-const path = require("path");
-const { v4: uuidv4 } = require("uuid");
+const vcsService = require("../services/vcsService");
+const { loadCliContext } = require("../utils/cliVcsContext");
 
 async function commitRepo(message) {
-  const repoPath = path.resolve(process.cwd(), ".initFold");
-  const stagedPath = path.join(repoPath, "staging");
-  const commitPath = path.join(repoPath, "commits");
+  const { repositoryId, userId } = await loadCliContext();
 
-  try {
-    const commitID = uuidv4();
-    const commitDir = path.join(commitPath, commitID);
-    await fs.mkdir(commitDir, { recursive: true });
+  const commit = await vcsService.createCommit(repositoryId, userId, {
+    message,
+  });
 
-    const files = await fs.readdir(stagedPath);
-    for (const file of files) {
-      await fs.copyFile(
-        path.join(stagedPath, file),
-        path.join(commitDir, file),
-      );
-    }
+  console.log(`Commit ${commit.commitId} created successfully!`);
 
-    await fs.writeFile(
-      path.join(commitDir, "commit.json"),
-      JSON.stringify({ message, date: new Date().toISOString() }),
-    );
-
-    console.log(`Commit ${commitID} created with message: ${message}`);
-  } catch (err) {
-    console.error("Error commiting files", err);
-  }
+  console.log(`Message: ${commit.message}`);
+  console.log(`Files: ${commit.fileCount}`);
+  console.log(`Parent: ${commit.parent || "none"}`);
 }
 
 module.exports = { commitRepo };

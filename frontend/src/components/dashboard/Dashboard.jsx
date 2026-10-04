@@ -72,8 +72,6 @@ const Dashboard = () => {
     const query = searchQuery.trim();
 
     if (!query) {
-      setSearchResults([]);
-      setSearchError("");
       return undefined;
     }
 
@@ -175,6 +173,8 @@ const Dashboard = () => {
                     onClick={() => {
                       setSearchType("repositories");
                       setSearchResults([]);
+                      setSearchError("");
+                      setSearchLoading(false);
                     }}
                   >
                     Repositories
@@ -186,6 +186,8 @@ const Dashboard = () => {
                     onClick={() => {
                       setSearchType("users");
                       setSearchResults([]);
+                      setSearchError("");
+                      setSearchLoading(false);
                     }}
                   >
                     Users
@@ -202,7 +204,16 @@ const Dashboard = () => {
                     ? "Search by repository name or description..."
                     : "Search by username..."
                 }
-                onChange={(event) => setSearchQuery(event.target.value)}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setSearchQuery(value);
+
+                  if (!value.trim()) {
+                    setSearchResults([]);
+                    setSearchError("");
+                    setSearchLoading(false);
+                  }
+                }}
               />
 
               {searchQuery.trim() && (

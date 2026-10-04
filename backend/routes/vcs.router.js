@@ -12,6 +12,22 @@ const vcsRouter = express.Router();
 
 vcsRouter.use(authMiddleware);
 
+/* Repository initialization */
+
+vcsRouter.post(
+  "/vcs/:repoId/init",
+  authorizeRepositoryOwner,
+  vcsController.initRepository,
+);
+
+/* Staging */
+
+vcsRouter.post(
+  "/vcs/:repoId/add",
+  authorizeRepositoryOwner,
+  vcsController.addFiles,
+);
+
 /* VCS status */
 
 vcsRouter.get(

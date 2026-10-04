@@ -5,6 +5,7 @@ const path = require("path");
 const Repository = require("../models/repoModel");
 const User = require("../models/userModel");
 const Issue = require("../models/issueModel");
+const vcsService = require("../services/vcsService");
 
 const { s3, S3_BUCKET } = require("../config/aws-config");
 
@@ -37,8 +38,28 @@ async function createRepository(req, res) {
 
     const result = await newRepository.save();
 
+    try {
+      await vcsService.initRepository(result._id, owner);
+      await User.findByIdAndUpdate(owner, {
+        $addToSet: {
+          repositories: result._id,
+        },
+      });
+    } catch (vcsError) {
+      await Repository.findByIdAndDelete(result._id);
+
+      console.error(
+        "Error during repository/VCS initialization",
+        vcsError.message,
+      );
+
+      return res.status(vcsError.status || 500).json({
+        error: vcsError.message || "Unable to initialize repository VCS.",
+      });
+    }
+
     res.status(201).json({
-      message: "Repository created!",
+      message: "Repository created and VCS initialized!",
       repositoryID: result._id,
     });
   } catch (error) {
@@ -313,13 +334,6 @@ async function deleteRepositoryById(req, res) {
       repositories/<repoId>/commits/...
     */
     await deleteS3Prefix(`repositories/${id}/`);
-
-    /*
-      Also remove the old web-VCS layout
-      if this repository was pushed before
-      the S3 structure was changed.
-    */
-    await deleteS3Prefix(`commits/${id}/`);
 
     /*
       Remove local VCS workspace/cache.

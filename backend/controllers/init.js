@@ -1,21 +1,51 @@
-const fs = require("fs").promises;
-const path = require("path");
+const vcsService = require("../services/vcsService");
+const {
+  loadCliContext,
+  selectCliRepository,
+} = require("../utils/cliVcsContext");
 
-async function initRepo() {
-  const repoPath = path.resolve(process.cwd(), ".initFold");
-  const commitsPath = path.join(repoPath, "commits");
-
+async function initRepo(repoName) {
   try {
-    await fs.mkdir(repoPath, { recursive: true });
-    await fs.mkdir(commitsPath, { recursive: true });
-    await fs.writeFile(
-      path.join(repoPath, "config.json"),
-      JSON.stringify({ bucket: "bucket" }),
+    if (!repoName || !String(repoName).trim()) {
+      throw new Error(
+        "Repository name is required. Usage: node index.js init <repoName>",
+      );
+    }
+
+    const { userId } = await loadCliContext({
+      requireRepository: false,
+    });
+
+    const repository = await vcsService.resolveRepositoryByName(
+      repoName,
+      userId,
     );
-    console.log("Repository initialised!");
-  } catch (err) {
-    console.error("Error inittialising repository", err); 
+
+    const result = await vcsService.initRepository(repository._id, userId);
+
+    await selectCliRepository({
+      repositoryId: repository._id,
+      repositoryName: repository.name,
+    });
+
+    console.log("Repository selected and initialized successfully!");
+
+    console.log(`User: ${userId}`);
+
+    console.log(`Repository: ${repository.name}`);
+
+    console.log(`Repository ID: ${repository._id}`);
+
+    console.log(`Local VCS path: ${result.localPath}`);
+
+    console.log(`S3 prefix: ${result.remotePrefix}/`);
+  } catch (error) {
+    console.error("Error initializing repository:", error.message);
+
+    throw error;
   }
 }
 
-module.exports = { initRepo };
+module.exports = {
+  initRepo,
+};

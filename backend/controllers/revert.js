@@ -1,25 +1,29 @@
-const fs = require("fs");
-const path = require("path");
-const { promisify } = require("util");
-
-const readdir = promisify(fs.readdir);
-const copyFile = promisify(fs.copyFile);
+const vcsService = require("../services/vcsService");
+const { loadCliContext } = require("../utils/cliVcsContext");
 
 async function revertRepo(commitID) {
-  const repoPath = path.resolve(process.cwd(), ".initFold");
-  const commitsPath = path.join(repoPath, "commits");
-
-  try{
-    const commitDir = path.join(commitsPath, commitID);
-    const files = await readdir(commitDir);
-    const parentDir = path.resolve(repoPath, "..");
-
-    for(const file of files){
-      await copyFile(path.join(commitDir, file ), path.join(parentDir, file));
+  try {
+    if (!commitID) {
+      throw new Error(
+        "Commit ID is required. Usage: node index.js revert <commitID>",
+      );
     }
-    console.log(`Commit ${commitID} reverted successfully!`);
-  }catch(err){
-    console.error("Unable to revert : ",err);
+
+    const { repositoryId, userId } = await loadCliContext();
+
+    const result = await vcsService.revertRepository(
+      repositoryId,
+      userId,
+      commitID,
+    );
+
+    console.log(result.message);
+    console.log(`Reverted commit: ${result.revertedCommitId}`);
+    console.log(`New commit: ${result.commit.commitId}`);
+  } catch (error) {
+    console.error("Unable to revert repository:", error.message);
+
+    throw error;
   }
 }
 

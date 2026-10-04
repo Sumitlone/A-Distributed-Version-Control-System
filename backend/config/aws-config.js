@@ -13,6 +13,10 @@ AWS.config.update({
 });
 
 const s3 = new AWS.S3();
-const S3_BUCKET = "demobucketsumitchi";
+const S3_BUCKET = process.env.S3_BUCKET;
+
+if (!S3_BUCKET) {
+  throw new Error("S3_BUCKET is not configured.");
+}
 
 module.exports = { s3, S3_BUCKET };

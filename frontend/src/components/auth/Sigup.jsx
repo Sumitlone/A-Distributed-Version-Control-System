@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import api from "../../api/apiClient";
 import { useAuth } from "../../authContext";
 import Alert from "../common/Alert";
