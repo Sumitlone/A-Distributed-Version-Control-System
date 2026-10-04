@@ -54,6 +54,47 @@ const VcsDashboard = () => {
 
   const [status, setStatus] = useState(null);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchRepository = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const response = await api.get(`/repo/${id}`);
+
+        if (cancelled) {
+          return;
+        }
+
+        const repo = response.data.repository || response.data;
+
+        setRepository(repo);
+      } catch (err) {
+        if (!cancelled) {
+          console.error("Cannot fetch repository for VCS:", err);
+
+          setError(
+            err.response?.data?.error ||
+              err.response?.data?.message ||
+              "Unable to load repository.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void fetchRepository();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
   const ownerId = useMemo(() => {
     if (!repository?.owner) {
       return null;

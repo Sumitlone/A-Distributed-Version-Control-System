@@ -958,6 +958,13 @@ async function getCommitHistory(repoId, userId) {
   await syncMissingRemoteCommits(repoId, remoteState);
 
   const localCommitIds = await getLocalCommitIds(repoId);
+  const isOwner = String(repository.owner) === String(userId);
+
+  const visibleCommitIds = isOwner
+    ? localCommitIds
+    : localCommitIds.filter((commitId) =>
+        remoteState.commitIds.includes(commitId),
+      );
   const commits = [];
 
   for (const commitId of localCommitIds) {
@@ -1005,6 +1012,12 @@ async function getCommitDetails(repoId, userId, commitId) {
 
   const localCommitIds = await getLocalCommitIds(repoId);
   const remoteState = await getRemoteState(repoId);
+
+  const isOwner = String(repository.owner) === String(userId);
+
+  if (!isOwner && !remoteState.commitIds.includes(commitId)) {
+    throw createVcsError("Commit not found!", 404);
+  }
 
   if (
     !localCommitIds.includes(commitId) &&

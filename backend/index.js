@@ -2,9 +2,9 @@ const dotenv = require("dotenv");
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
-const bodyParser = require("body-parser");
+// const bodyParser = require("body-parser");
 const http = require("http");
-const { Server } = require("socket.io");
+// const { Server } = require("socket.io");
 const mainRouter = require("./routes/main.router");
 
 const yargs = require("yargs");
@@ -117,7 +117,7 @@ function startServer() {
   const app = express();
   const port = process.env.PORT || 3002;
 
-  app.use(bodyParser.json());
+  // app.use(bodyParser.json());
   app.use(express.json());
 
   const mongoURI = process.env.MONGODB_URI;
@@ -150,30 +150,30 @@ function startServer() {
 
   app.use("/", mainRouter);
 
-  let user = "test";
+  // let user = "test";
   const httpServer = http.createServer(app);
-  const io = new Server(httpServer, {
-    cors: {
-      origin: "*",
-      methods: ["GET", "POST"],
-    },
-  });
+  // const io = new Server(httpServer, {
+  //   cors: {
+  //     origin: "*",
+  //     methods: ["GET", "POST"],
+  //   },
+  // });
 
-  io.on("connection", (socket) => {
-    socket.on("joinRoom", (userID) => {
-      user = userID;
-      console.log("======");
-      console.log(user);
-      console.log("======");
-      socket.join(userID);
-    });
-  });
+  // io.on("connection", (socket) => {
+  //   socket.on("joinRoom", (userID) => {
+  //     user = userID;
+  //     console.log("======");
+  //     console.log(user);
+  //     console.log("======");
+  //     socket.join(userID);
+  //   });
+  // });
 
-  const db = mongoose.connection;
-  db.once("open", async () => {
-    console.log("CRUD operations called");
-    //CRUD operations
-  });
+  // const db = mongoose.connection;
+  // db.once("open", async () => {
+  //   console.log("CRUD operations called");
+  //   //CRUD operations
+  // });
 
   httpServer.listen(port, () => {
     console.log(`Server is running on PORT ${port}`);
