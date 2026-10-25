@@ -21,6 +21,7 @@ This document describes the architecture, data model, REST API, version-control 
 15. [Testing](#15-testing)
 16. [Error handling conventions](#16-error-handling-conventions)
 17. [Known limitations and suggested improvements](#17-known-limitations-and-suggested-improvements)
+18. [Change log](#18-change-log)
 
 ---
 
@@ -38,7 +39,7 @@ Design goals visible in the code:
 
 - **One source of truth for history** — commit snapshots live in AWS S3 under `repositories/<repoId>/`. The web UI and the CLI use the same prefix, so work done in one is visible in the other after a push/pull.
 - **Immutable, snapshot-based commits** — every commit is a full copy of the staged files plus a `commit.json` metadata file.
-- **Owner-only writes** — only the repository owner can stage, commit, push, pull, revert, edit or delete. Other users can read public repositories.
+- **Owner-only writes** — only the repository owner can stage, commit, push, pull, revert, edit or delete. Other users can read public repositories, but only the commits that have been **pushed**.
 
 ## 2. Architecture
 
@@ -63,13 +64,13 @@ flowchart LR
 | `services/vcsService` | The version-control engine: staging, commits, push, pull, revert, status, history                         |
 | `services/authService` | Credential check, JWT creation and verification (shared by the API and the CLI)                          |
 | `utils/cli*`        | CLI session file handling and MongoDB connection lifecycle                                                 |
-| `config/aws-config` | Configures the AWS SDK v2 S3 client and exports the bucket name                                            |
+| `config/aws-config` | Configures the AWS SDK v2 S3 client and exports the bucket name from `S3_BUCKET` (throws at startup if it is not set) |
 
 ### Important architectural note: the CLI is not an API client
 
 The CLI does **not** call the REST API. It loads the same service layer as the server, connects to MongoDB directly (`utils/cliDatabase.js`) and talks to S3 directly. Consequences:
 
-- The machine running the CLI needs the backend `.env` (MongoDB URI, JWT secret, AWS credentials).
+- The machine running the CLI needs the backend `.env` (MongoDB URI, JWT secret, AWS credentials and `S3_BUCKET`).
 - Authentication in the CLI is done by `authService.authenticateUser` against MongoDB, and the resulting JWT is stored locally in `.vcs/config.json`.
 
 ### Request flow (REST)
@@ -90,8 +91,8 @@ The CLI does **not** call the REST API. It loads the same service layer as the s
 |           | aws-sdk (v2)           | ^2.1693.0                     |
 |           | yargs                  | ^18.1.0                       |
 |           | uuid                   | ^14.0.1                       |
-|           | socket.io              | ^4.8.3                        |
-|           | cors, dotenv, body-parser | ^2.8.6, ^17.4.2, ^2.3.0    |
+|           | cors, dotenv           | ^2.8.6, ^17.4.2               |
+|           | socket.io, body-parser, http | ^4.8.3, ^2.3.0, ^0.0.1-security (installed but **not used** — see section 17) |
 | Frontend  | react / react-dom      | ^19.2.8                       |
 |           | react-router-dom       | ^7.18.4                       |
 |           | axios                  | ^1.20.0                       |
@@ -108,13 +109,14 @@ The CLI does **not** call the REST API. It loads the same service layer as the s
 Version Control System/
 ├── .gitignore
 ├── README.md
+├── DOCUMENTATION.md
 ├── TEST_CHECKLIST.md
 ├── backend/
 │   ├── index.js                       # Server + CLI entry point
 │   ├── package.json
 │   ├── .env                           # (not committed) configuration
 │   ├── config/
-│   │   └── aws-config.js              # S3 client, S3_BUCKET constant
+│   │   └── aws-config.js              # S3 client; S3_BUCKET read from the environment
 │   ├── controllers/
 │   │   ├── userController.js          # signup, login, profile, star, follow, delete account
 │   │   ├── repoController.js          # repository CRUD, search, visibility
@@ -130,7 +132,7 @@ Version Control System/
 │   ├── models/                        # userModel, repoModel, issueModel
 │   ├── routes/                        # main, user, repo, issue, dashboard, vcs routers
 │   ├── scripts/
-│   │   └── cleanupLegacyVcsS3.js      # deletes legacy "commits/" S3 objects
+│   │   └── cleanupLegacyVcsS3.js      # deletes legacy "commits/" S3 objects (git-ignored)
 │   ├── services/
 │   │   ├── authService.js
 │   │   └── vcsService.js              # the VCS engine (~1300 lines)
@@ -401,8 +403,8 @@ All paths are under `/vcs/:repoId`.
 | GET    | `/status`               | owner  | `{ localHead, remoteHead, ahead, behind, aheadCommitIds, behindCommitIds, synchronized, remoteCommitCount, stagedFileCount, stagedFiles, metadata }` |
 | GET    | `/workspace`            | owner  | `{ files: [{ name, content }], head: { local, remote }, status: { ahead, behind } }`. Rebuilds the local workspace from S3 if there is no local HEAD. |
 | POST   | `/commits`              | owner  | Body `{ message }`. Commits the staged files locally → `201 { message, commit }`. |
-| GET    | `/commits`              | viewer | `{ commits: [{ commitId, message, date, parent, reverts, files, fileCount, pushed }], remoteHead }`, newest first. |
-| GET    | `/commits/:commitId`    | viewer | `{ commit: { commitId, message, date, parent, reverts, files: [{ name, content }], pushed } }` |
+| GET    | `/commits`              | viewer | `{ commits: [{ commitId, message, date, parent, reverts, files, fileCount, pushed }], remoteHead }`, newest first. **Owner:** all local and remote commits. **Other users:** only commits that exist on S3 (pushed). |
+| GET    | `/commits/:commitId`    | viewer | `{ commit: { commitId, message, date, parent, reverts, files: [{ name, content }], pushed } }`. Non-owners get `404` for a commit that has not been pushed. |
 | POST   | `/push`                 | owner  | Uploads missing commits → `{ pushedCommitCount, uploadedFiles, localHead, remoteHead, bucket, prefix, metadataKey, headKey }`. |
 | POST   | `/pull`                 | owner  | Downloads missing commits and restores the workspace → `{ downloadedCommitCount, latestCommitId, localHead, remoteHead, workspaceFileCount }`. |
 | POST   | `/revert/:commitId`     | owner  | Creates a revert commit locally → `201 { commit, revertedCommitId }`.        |
@@ -511,7 +513,7 @@ It restores a *snapshot*; it does not compute an inverse patch of one commit as 
 
 - **workspace** — if there is no local HEAD but the remote has one, downloads all missing commits and restores the workspace from the remote HEAD (this is how a deleted `.vcsRepos/<repoId>` is rebuilt). Returns files plus ahead/behind counts.
 - **status** — computes ahead/behind from the commit-ID sets; `synchronized` is true when both HEADs match and nothing is ahead or behind (or both are empty). When a remote HEAD exists it also rewrites the remote `HEAD` and `metadata.json` to keep them consistent.
-- **history / details** — first downloads any commits that exist remotely but not locally, then reads them from the local cache. Each entry has `pushed: true/false`.
+- **history / details** — first downloads any commits that exist remotely but not locally, then reads them from the local cache. Each entry has `pushed: true/false`. **Visibility rule:** the owner sees every local commit (including unpushed ones); any other viewer only sees commits that exist on S3, and requesting an unpushed commit returns `404 Commit not found!`.
 
 ### 10.3 Error cases
 
@@ -528,7 +530,7 @@ It restores a *snapshot*; it does not compute an inverse patch of one commit as 
 | pull       | No remote commits                          | 404    |
 | pull       | Unpushed local commits                     | 409    |
 | details / revert | Invalid commit ID                    | 400    |
-| details / revert | Commit not found                     | 404    |
+| details / revert | Commit not found (for non-owners: also any unpushed commit) | 404    |
 
 ## 11. CLI reference
 
@@ -608,10 +610,10 @@ All routes except `/auth` and `/signup` are wrapped in `ProtectedRoute`, which r
 
 | Component            | Notes |
 | -------------------- | ----- |
-| `VcsDashboard`       | Only the owner loads workspace/status. Files are kept in component state; **any edit sets the staged count to 0**, so the user must stage again before committing. Validates non-empty, unique file names. Shows ahead/behind status, and asks for confirmation before a pull replaces the workspace. |
+| `VcsDashboard`       | Fetches the repository itself, then (owner only) loads workspace and status. Non-owners see a read-only notice. A **status card** shows Local HEAD, Remote HEAD, *Sync state* (`Up to date`, `N unpushed`, `N behind` or `Diverged` when both ahead and behind), remote commit count and staged-file count. Files are kept in component state; **any edit sets the staged count to 0**, so the user must stage again before committing. Validates non-empty, unique file names. Shows ahead/behind status, and asks for confirmation before a pull replaces the workspace. |
 | `VcsFileTree`        | Builds a folder tree from `/`-separated file names; folders expand/collapse. |
 | `CodeEditor`         | A `<textarea>` with synchronized line numbers. The language dropdown is a label only — there is no syntax highlighting. |
-| `ReadmeViewer`       | Finds `README.md` (case-insensitive) in the newest commit and renders a small Markdown subset: headings, bullet lists, fenced code blocks, **bold**, `inline code` and `http(s)` links. Text is HTML-escaped first. Tables, images and italics are not supported. |
+| `ReadmeViewer`       | Finds `README.md` (case-insensitive) in the newest commit **visible to the viewer** (for non-owners, the newest pushed commit) and renders a small Markdown subset: headings, bullet lists, fenced code blocks, **bold**, `inline code` and `http(s)` links. Text is HTML-escaped first. Tables, images and italics are not supported. |
 | `RepositoryActivity` | Merges commits and issues into one list sorted by date and shows the latest 10. |
 | `RepositoryTabs`     | Code / Issues / Settings navigation. |
 | `ConfirmContext`     | `useConfirm()` returns a promise-based, themed confirmation dialog (used for destructive actions). |
@@ -636,8 +638,9 @@ Each feature has its own CSS file (for example `vcs.css`, `dashboard.css`). `@pr
 | `AWS_ACCESS_KEY_ID`     | **yes**  | —                       | AWS credentials for S3                                              |
 | `AWS_SECRET_ACCESS_KEY` | **yes**  | —                       | AWS credentials for S3                                              |
 | `AWS_REGION`            | **yes**  | —                       | Region of the bucket (for example `ap-south-1`)                     |
+| `S3_BUCKET`             | **yes**  | —                       | Name of the S3 bucket that stores commit snapshots                  |
 
-**S3 bucket name:** not an environment variable. It is the constant `S3_BUCKET` in `backend/config/aws-config.js` and must be changed to your own bucket.
+`S3_BUCKET` is validated when `config/aws-config.js` is loaded. If it is missing, the server and every CLI command fail immediately with `S3_BUCKET is not configured.`
 
 ### 13.2 Frontend environment variables (`frontend/.env`)
 
@@ -679,7 +682,7 @@ The REST API accepts requests from origins listed in `CLIENT_URL`, from tools wi
 # Backend
 cd backend
 npm install
-# create .env (see section 13.1) and set S3_BUCKET in config/aws-config.js
+# create .env (see section 13.1), including S3_BUCKET
 npm start                      # http://localhost:3002
 
 # Frontend
@@ -701,7 +704,7 @@ The backend does **not** serve the frontend; host `frontend/dist` on any static 
 
 ### Deployment checklist (summary)
 
-- Set `CLIENT_URL` to the deployed frontend origin and build the frontend with the deployed `VITE_API_URL`.
+- Set `CLIENT_URL`, `S3_BUCKET` and the other backend variables on the host, and build the frontend with the deployed `VITE_API_URL`.
 - Keep `.env` files, `.vcs/`, `.vcsRepos/` and `.initFold/` out of version control.
 - Give the server a **persistent disk** for `.vcsRepos/` (it is a cache that can be rebuilt from S3, but the unpushed commits and staging only exist there).
 - Run the API under a process manager (for example pm2 or systemd).
@@ -736,22 +739,34 @@ Most errors return `{ "message": "…" }`. Some repository and issue endpoints r
 - **Full-snapshot storage** — every commit stores complete copies of its files (no deduplication or delta compression).
 - **Text files only** — content is read and written as UTF-8.
 - **Repository names are globally unique**, not per owner.
-- **Hardcoded S3 bucket name** in `config/aws-config.js`.
 - **Server-side local cache** (`.vcsRepos/`) requires persistent disk; multiple server instances would each hold their own cache and synchronize only through S3.
-- **Socket.IO** is initialized on the server (a `joinRoom` event joins a room per user) but no frontend client or events use it; its CORS is `*`.
+- **Unused dependencies:** `socket.io` and `body-parser` are still listed in `backend/package.json`, but their code in `index.js` is commented out (the server uses `express.json()`). Some commented-out legacy code also remains in `index.js` and `userController.js`.
 - **Profile heat-map** shows random placeholder data.
 - **Signup** only checks for duplicate usernames and does not validate email format or password strength; a duplicate email results in a generic `500`.
 - **`GET /vcs/:repoId/status`** has a side effect: it rewrites the remote `HEAD` and `metadata.json` when a remote HEAD exists.
 - **`http`** in `backend/package.json` is the npm placeholder package; Node's built-in module is what is actually used, so the dependency can be removed.
+- **`cleanupLegacyVcsS3.js`** is listed in `.gitignore`, so it is not part of the Git repository.
 
 **Suggested improvements**
 
-- Read the S3 bucket name from an environment variable.
 - Use a long random `JWT_SECRET_KEY`; consider short-lived access tokens with refresh, and `httpOnly` cookies instead of `localStorage`.
 - Add rate limiting and security headers (for example `express-rate-limit`, `helmet`) and request validation (for example `zod` or `joi`).
-- Restrict Socket.IO CORS or remove Socket.IO until it is needed.
+- Remove the unused dependencies (`socket.io`, `body-parser`, `http`) and the commented-out code.
 - Add automated tests (API integration tests for authorization and the push/pull/revert rules).
 - Unify error response shapes to `{ message }`.
 - Add a diff view, branches, and repository collaborators.
 - Replace the placeholder heat-map data with real commit activity.
 - Rotate any credentials that were ever committed or shared.
+
+## 18. Change log
+
+Changes reflected in this version of the documentation compared with the previous one:
+
+| Area | Change |
+| ---- | ------ |
+| Configuration | The S3 bucket name is now read from the **`S3_BUCKET`** environment variable instead of being hardcoded. It is required: the server and the CLI fail at startup if it is missing. |
+| Repository visibility | Visitors to a repository can now only see **pushed** commits. The commit history and commit-details endpoints hide unpushed local commits from non-owners (`404` for direct access); the owner still sees everything. |
+| Server | Socket.IO and `body-parser` usage in `index.js` was commented out; JSON parsing uses `express.json()` only. |
+| Issues | The visibility check in `issueController` now also handles a populated `owner` object correctly. |
+| Frontend | `VcsDashboard` shows a sync-state card (Local/Remote HEAD, *Up to date / N unpushed / N behind / Diverged*, remote commits, staged files) and a read-only notice for non-owners. |
+| Repository | `backend/scripts/cleanupLegacyVcsS3.js` was added to `.gitignore`; `DOCUMENTATION.md` is now part of the project root. |
