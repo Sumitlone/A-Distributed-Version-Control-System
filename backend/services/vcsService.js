@@ -967,9 +967,10 @@ async function getCommitHistory(repoId, userId) {
       );
   const commits = [];
 
-  for (const commitId of localCommitIds) {
+  for (const commitId of visibleCommitIds) {
     try {
       const metadata = await readLocalCommitMetadata(repoId, commitId);
+
       const commitFiles = await readFilesRecursively(
         path.join(getCommitsPath(repoId), commitId),
       );

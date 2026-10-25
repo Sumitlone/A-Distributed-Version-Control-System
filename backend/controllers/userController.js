@@ -158,8 +158,7 @@ async function searchUsers(req, res) {
 // Get all users
 async function getAllUsers(req, res) {
   try {
-    const users = await User.find({}).select("-password");
-
+    const users = await User.find({}).select("_id username");
     res.json(users);
   } catch (error) {
     console.error("Error during fetching:", error.message);

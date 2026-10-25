@@ -3,7 +3,14 @@ const Repository = require("../models/repoModel");
 const Issue = require("../models/issueModel");
 
 function isRepositoryOwner(repository, userId) {
-  return repository && userId && String(repository.owner) === String(userId);
+  const repositoryOwnerId =
+    repository?.owner?._id ?? repository?.owner;
+
+  return Boolean(
+    repositoryOwnerId &&
+    userId &&
+    String(repositoryOwnerId) === String(userId)
+  );
 }
 
 async function ensureCanViewRepository(req, repository) {
