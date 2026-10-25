@@ -11,7 +11,8 @@ A Git-inspired version control platform with a **React web app**, a **Node.js / 
 - **Accounts** – sign up / log in with JWT authentication (bcrypt-hashed passwords), profile page, follow users, star repositories, delete account.
 - **Repositories** – create public or private repositories, edit the description, toggle visibility, delete (cascades to issues, stars and S3 data), search.
 - **Version control** – `stage → commit → push → pull → revert`. Commits are UUID-identified snapshots with parent links, ahead/behind status and push-divergence protection.
-- **Browser workspace** – file tree and code editor with line numbers, commit history, and a per-commit file viewer.
+- **Browser workspace** – file tree and code editor with line numbers, a live sync-status panel (local HEAD, remote HEAD, *Up to date / N unpushed / N behind / Diverged*), commit history, and a per-commit file viewer.
+- **Safe sharing** – visitors to a public repository only see commits that have been **pushed**; unpushed local commits are visible to the owner only.
 - **README rendering** – a repository's `README.md` is rendered on its page from the latest commit.
 - **Issues** – create, edit, open/close and delete issues per repository.
 - **Dashboard** – repository and user search, suggested repositories, personal statistics.
@@ -23,7 +24,7 @@ A Git-inspired version control platform with a **React web app**, a **Node.js / 
 | Layer     | Technology                                                                 |
 | --------- | -------------------------------------------------------------------------- |
 | Frontend  | React 19, Vite 8, React Router 7, Axios, Primer React, `@uiw/react-heat-map` |
-| Backend   | Node.js (CommonJS), Express 5, Mongoose 9, Socket.IO 4, Yargs 18           |
+| Backend   | Node.js (CommonJS), Express 5, Mongoose 9, AWS SDK v2, Yargs 18            |
 | Auth      | JSON Web Tokens (`jsonwebtoken`), `bcryptjs`                               |
 | Storage   | MongoDB (users, repositories, issues) · AWS S3 (commit snapshots)          |
 | Tooling   | oxlint                                                                     |
@@ -60,7 +61,7 @@ Version Control System/
 │   ├── routes/               # Express routers
 │   ├── services/             # authService, vcsService (the VCS engine)
 │   ├── utils/                # CLI session and database helpers
-│   └── scripts/              # Maintenance scripts (legacy S3 cleanup)
+│   └── scripts/              # Local maintenance script (git-ignored)
 ├── frontend/
 │   └── src/
 │       ├── api/apiClient.js  # Axios instance with JWT interceptor
@@ -68,6 +69,7 @@ Version Control System/
 │       ├── authContext.jsx   # Auth state
 │       └── Routes.jsx        # Route table
 ├── TEST_CHECKLIST.md         # Manual production test checklist
+├── DOCUMENTATION.md          # Full technical documentation
 └── README.md
 ```
 
@@ -77,7 +79,7 @@ Version Control System/
 
 - **Node.js** `20.19+` or `22.12+` (required by the Vite and Mongoose versions used)
 - A **MongoDB** database (MongoDB Atlas or local)
-- An **AWS S3 bucket** and an IAM user with access to it (see [DOCUMENTATION.md](./DOCUMENTATION.md#133-s3-iam-policy))
+- An **AWS S3 bucket** (create it first) and an IAM user with access to it (see [DOCUMENTATION.md](./DOCUMENTATION.md#133-s3-iam-policy))
 
 ### 1. Clone and install
 
@@ -102,7 +104,10 @@ CLIENT_URL=http://localhost:5173
 AWS_ACCESS_KEY_ID=<your-access-key-id>
 AWS_SECRET_ACCESS_KEY=<your-secret-access-key>
 AWS_REGION=ap-south-1
+S3_BUCKET=<your-bucket-name>
 ```
+
+> **Important:** `S3_BUCKET` is **required**. The server and the CLI stop at startup with `S3_BUCKET is not configured.` if it is missing.
 
 ### 3. Configure the frontend (optional)
 
@@ -151,7 +156,7 @@ The repository must already exist (create it in the web app first). The CLI talk
 | Location    | Command                                            | Purpose                           |
 | ----------- | -------------------------------------------------- | --------------------------------- |
 | `backend/`  | `npm start`                                        | Start the API server              |
-| `backend/`  | `node scripts/cleanupLegacyVcsS3.js [--dry-run]`   | Remove legacy `commits/` S3 data  |
+| `backend/`  | `node scripts/cleanupLegacyVcsS3.js [--dry-run]`   | Remove legacy `commits/` S3 data (script is git-ignored; local only) |
 | `frontend/` | `npm run dev`                                      | Vite dev server                   |
 | `frontend/` | `npm run build`                                    | Production build to `dist/`       |
 | `frontend/` | `npm run lint`                                     | Lint with oxlint                  |
